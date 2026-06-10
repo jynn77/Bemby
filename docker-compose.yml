@@ -1,0 +1,28 @@
+services:
+  bemby:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - bemby-data:/app/data
+    # Loads ADMIN_USERNAME, ADMIN_PASSWORD, JWT_SECRET, TZ from .env
+    env_file: .env
+    environment:
+      # Internal port is always 3000; host-side port is controlled by PORT in .env
+      PORT: 3000
+      DB_PATH: /app/data/bemby.db
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bemby-data:

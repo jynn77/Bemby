@@ -1,0 +1,293 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  font-size: 14px;
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────────── */
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  padding: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  padding: 0 12px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 8px;
+}
+
+.sidebar-version {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.35);
+  margin-top: 3px;
+  letter-spacing: 0.03em;
+}
+
+.nav-link {
+  display: block;
+  padding: 9px 12px;
+  color: #aaa;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-link:hover { background: rgba(255,255,255,0.07); color: #fff; }
+.nav-link.router-link-active { background: #16213e; color: #fff; }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.logout-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+
+.lang-switcher {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+}
+
+.lang-btn {
+  flex: 1;
+  padding: 5px 4px;
+  background: rgba(255,255,255,0.06);
+  border: none;
+  border-radius: 4px;
+  color: #777;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lang-btn:hover { background: rgba(255,255,255,0.12); color: #ddd; }
+
+.main {
+  flex: 1;
+  padding: 28px;
+  overflow-y: auto;
+}
+
+/* ── Page header ────────────────────────────────────────────────────────────── */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.page-title { font-size: 20px; font-weight: 600; }
+
+/* ── Card ────────────────────────────────────────────────────────────────────── */
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+/* ── Table ────────────────────────────────────────────────────────────────────── */
+
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 11px 14px; text-align: left; }
+th { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; border-bottom: 1px solid #f0f0f0; }
+tr:not(:last-child) td { border-bottom: 1px solid #f8f8f8; }
+tr:hover td { background: #fafafa; }
+
+.actions { display: flex; gap: 8px; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:not(:disabled):hover { opacity: 0.85; }
+
+.btn-primary { background: #4361ee; color: #fff; }
+.btn-success { background: #2ec4b6; color: #fff; }
+.btn-danger  { background: #e63946; color: #fff; }
+.btn-ghost   { background: #f0f2f5; color: #444; }
+.btn-sm      { padding: 5px 10px; font-size: 12px; }
+
+/* ── Status badges ────────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge-green  { background: #d1fae5; color: #065f46; }
+.badge-orange { background: #fef3c7; color: #92400e; }
+.badge-red    { background: #fee2e2; color: #991b1b; }
+.badge-grey   { background: #f0f0f0; color: #666; }
+.badge-blue   { background: #dbeafe; color: #1e40af; }
+
+/* ── Modal ───────────────────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+/* ── Form ────────────────────────────────────────────────────────────────────── */
+
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 5px; color: #444; }
+
+.form-input, .form-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.form-input:focus, .form-select:focus { border-color: #4361ee; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.form-check { display: flex; align-items: center; gap: 8px; }
+.form-check input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+
+/* ── Empty state ─────────────────────────────────────────────────────────────── */
+
+.empty { padding: 48px; text-align: center; color: #aaa; }
+
+/* ── Feedback messages ───────────────────────────────────────────────────────── */
+
+.error-msg {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.success-msg {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* ── Card with padding (for form/settings cards) ─────────────────────────────── */
+
+.card-body {
+  padding: 24px;
+}
+
+.card-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 16px;
+}
+
+/* ── Login page ──────────────────────────────────────────────────────────────── */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f2f5;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 36px;
+  width: 380px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+}
+
+.login-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.login-subtitle { color: #888; margin-bottom: 24px; font-size: 13px; }
