@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -e
 
 # ── Configurable host / ports ─────────────────────────────────────────────────
 BACKEND_HOST=${BACKEND_HOST:-localhost}
@@ -32,9 +31,9 @@ fi
 echo "Installing dependencies..."
 # utf-8-validate (optional ws perf addon) needs make to compile from source which
 # may not be available -- use --ignore-scripts and restore better-sqlite3's prebuilt
-(cd backend && npm install --ignore-scripts)
+(cd backend && npm install --ignore-scripts) || true
 (cd backend/node_modules/better-sqlite3 && node ../prebuild-install/bin.js 2>&1 || true)
-(cd frontend && npm install)
+(cd frontend && npm install --no-audit) || true
 
 # ── Cleanup on exit ───────────────────────────────────────────────────────────
 BACKEND_PID=""
@@ -48,6 +47,21 @@ cleanup() {
   wait
 }
 trap cleanup EXIT INT TERM
+
+# ── Kill any existing processes on configured ports ───────────────────────────
+kill_port() {
+  local PORT=$1
+  local PIDS
+  PIDS=$(ss -tlnp "sport = :$PORT" 2>/dev/null | grep -oP 'pid=\K[0-9]+')
+  [ -z "$PIDS" ] && return 0
+  echo "Killing existing process(es) on port $PORT: $PIDS"
+  kill -9 $PIDS 2>/dev/null || true
+  sleep 0.5
+}
+
+for PORT in $BACKEND_PORT $FRONTEND_PORT; do
+  kill_port "$PORT"
+done
 
 # ── Start services ────────────────────────────────────────────────────────────
 echo ""
@@ -67,7 +81,7 @@ until (echo > /dev/tcp/127.0.0.1/$BACKEND_PORT) 2>/dev/null; do
 done
 echo " ready"
 
-(cd frontend && BACKEND_HOST=$PROXY_HOST BACKEND_PORT=$BACKEND_PORT npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT") &
+(cd frontend && BACKEND_HOST=$PROXY_HOST BACKEND_PORT=$BACKEND_PORT npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" --strictPort) &
 FRONTEND_PID=$!
 
 wait

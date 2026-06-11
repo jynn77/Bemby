@@ -71,6 +71,51 @@ export function expandCommand(template: string): string {
   });
 }
 
+// ── AI button selection via Qwen3-VL ─────────────────────────────────────────
+
+// Strips HTML tags to plain text for the AI prompt
+function htmlToText(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+async function selectButtonWithAI(buttons: string[][], html: string, image: string | undefined): Promise<string> {
+  const apiKey = process.env.QWEN_API_KEY;
+  if (!apiKey) throw new Error('{aiBtn} requires QWEN_API_KEY environment variable');
+
+  const baseUrl = (process.env.QWEN_BASE_URL ?? 'https://dashscope.aliyuncs.com/compatible-mode/v1').replace(/\/$/, '');
+  const model = process.env.QWEN_MODEL ?? 'qwen-vl-max-latest';
+
+  const flat = buttons.flat();
+  const text = htmlToText(html);
+  const prompt = `A Telegram bot sent a message asking for a daily check-in action.\n\nMessage text:\n${text}\n\nAvailable inline buttons: ${JSON.stringify(flat)}\n\nWhich button should be clicked to complete the daily check-in? Reply with ONLY the exact button text from the list, nothing else.`;
+
+  const content: object[] = [];
+  if (image) content.push({ type: 'image_url', image_url: { url: image } });
+  content.push({ type: 'text', text: prompt });
+
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages: [{ role: 'user', content }], max_tokens: 50 }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Qwen API error ${res.status}: ${body}`);
+  }
+
+  const data = await res.json() as { choices?: { message?: { content?: string } }[] };
+  const picked = data.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!picked) throw new Error('Qwen API returned an empty response');
+
+  // Prefer exact match, then partial
+  const exact = flat.find(b => b === picked);
+  if (exact) return exact;
+  const partial = flat.find(b => b.includes(picked) || picked.includes(b));
+  if (partial) return partial;
+  throw new Error(`AI selected "${picked}" but it does not match any available button: ${JSON.stringify(flat)}`);
+}
+
 // ── HTML helpers ──────────────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
@@ -328,12 +373,33 @@ export async function runCheckin(
     if (!buttonsMsg) throw new Error('No message with buttons received');
 
     if (signal?.aborted) throw new Error('Job cancelled');
+
+    const allBtnRows: any[] = (buttonsMsg as any).buttons ?? [];
+
+    // Resolve target button text and match mode
+    let targetText: string;
+    let useExactMatch: boolean;
+
+    if (checkinButton === '{anyBtn}') {
+      const flat = allBtnRows.flatMap((row: any[]) => row.map((btn: any) => btn.text as string));
+      if (!flat.length) throw new Error('No buttons available for {anyBtn}');
+      targetText = flat[Math.floor(Math.random() * flat.length)];
+      useExactMatch = true;
+    } else if (checkinButton === '{aiBtn}') {
+      targetText = await selectButtonWithAI(log.availableButtons, log.commandResponseHtml, log.commandResponseImage);
+      useExactMatch = true;
+    } else {
+      targetText = checkinButton;
+      useExactMatch = false;
+    }
+
     const peer = await client.getInputEntity(botUsername);
     let clicked = false;
 
-    for (const row of (buttonsMsg as any).buttons ?? []) {
+    for (const row of allBtnRows) {
       for (const btn of row) {
-        if (btn.text.includes(checkinButton)) {
+        const matches = useExactMatch ? btn.text === targetText : btn.text.includes(targetText);
+        if (matches) {
           // Start watching for an edit BEFORE invoking to avoid a race condition
           const editPromise = waitForBotMessageEdit(client, buttonsMsg.id, 10_000, signal);
 
@@ -364,7 +430,8 @@ export async function runCheckin(
       if (clicked) break;
     }
 
-    if (!clicked) throw new Error(`Button "${checkinButton}" not found in bot reply`);
+    const notFoundLabel = checkinButton === '{aiBtn}' ? `{aiBtn} -> "${targetText}"` : `"${checkinButton}"`;
+    if (!clicked) throw new Error(`Button ${notFoundLabel} not found in bot reply`);
 
     return log;
   } catch (err: any) {

@@ -45,10 +45,10 @@
             <div class="card-section-title">账户</div>
             <p class="help-para">账户代表 Telegram 用户会话。每个签到任务需要一个已认证的账户。</p>
             <table class="help-table">
-              <tr><td>API ID / API Hash</td><td>在 <code>my.telegram.org</code> 的"API development tools"中获取。</td></tr>
+              <tbody><tr><td>API ID / API Hash</td><td>在 <code>my.telegram.org</code> 的"API development tools"中获取。</td></tr>
               <tr><td>发送验证码</td><td>通过 Telegram 向账户手机号发送登录验证码。</td></tr>
               <tr><td>验证</td><td>输入收到的验证码。若启用了二步验证，请在提示时输入 2FA 密码。</td></tr>
-            </table>
+            </tbody></table>
             <div class="help-badges-row">
               <span class="badge badge-grey">未认证</span>
               <span class="badge badge-orange">等待验证码 / 二步验证</span>
@@ -60,10 +60,10 @@
             <div class="card-section-title">Accounts</div>
             <p class="help-para">Accounts represent Telegram user sessions. Each job requires one authenticated account.</p>
             <table class="help-table">
-              <tr><td>API ID / API Hash</td><td>Obtain from <code>my.telegram.org</code> under "API development tools".</td></tr>
+              <tbody><tr><td>API ID / API Hash</td><td>Obtain from <code>my.telegram.org</code> under "API development tools".</td></tr>
               <tr><td>Request Code</td><td>Sends a login code to the account's phone number via Telegram.</td></tr>
               <tr><td>Verify</td><td>Enter the code received. If two-factor auth is enabled, enter the 2FA password when prompted.</td></tr>
-            </table>
+            </tbody></table>
             <div class="help-badges-row">
               <span class="badge badge-grey">Unauthenticated</span>
               <span class="badge badge-orange">Pending code / 2FA</span>
@@ -87,17 +87,17 @@
               <strong>机器人用户名</strong>字段接受带或不带 <code>@</code> 前缀的机器人账号。
             </p>
             <table class="help-table">
-              <tr><td>启动命令</td><td>发送给机器人的命令，默认 <code>/start</code>。支持模板占位符，留空则使用默认值。</td></tr>
+              <tbody><tr><td>启动命令</td><td>发送给机器人的命令，默认 <code>/start</code>。支持模板占位符，留空则使用默认值。</td></tr>
               <tr><td>签到按钮文字</td><td>用于在机器人回复的内联键盘中匹配按钮的文字，默认 <code>签到</code>。</td></tr>
-            </table>
+            </tbody></table>
             <p class="help-para"><strong>命令模板占位符</strong>——可在启动命令中嵌入动态内容，每次执行时随机生成：</p>
             <table class="help-table">
-              <tr><td><code>{word}</code> / <code>{word:N}</code></td><td>N 位随机小写字母（默认 6 位）</td></tr>
+              <tbody><tr><td><code>{word}</code> / <code>{word:N}</code></td><td>N 位随机小写字母（默认 6 位）</td></tr>
               <tr><td><code>{WORD}</code> / <code>{WORD:N}</code></td><td>N 位随机大写字母（默认 6 位）</td></tr>
               <tr><td><code>{num}</code> / <code>{num:N}</code></td><td>N 位随机数字（默认 6 位）</td></tr>
               <tr><td><code>{alpha}</code> / <code>{alpha:N}</code></td><td>N 位随机大小写字母与数字混合（默认 8 位）</td></tr>
               <tr><td><code>{uuid}</code></td><td>随机 UUID v4</td></tr>
-            </table>
+            </tbody></table>
             <p class="help-note">示例：<code>/create {word:4}-{num:6}</code> 发送时会变成 <code>/create abcd-829341</code></p>
 
             <div class="card-section-title" style="margin-top:16px;font-size:11px">观看（Emby Watch）</div>
@@ -106,11 +106,11 @@
               然后将会话标记为已停止。可用于保持 Emby 账户活跃。
             </p>
             <table class="help-table">
-              <tr><td>服务器地址</td><td>Emby 服务器完整地址，如 <code>https://emby.example.com:443</code>。粘贴含协议和端口的完整 URL 时会自动解析并填充各字段。</td></tr>
+              <tbody><tr><td>服务器地址</td><td>Emby 服务器完整地址，如 <code>https://emby.example.com:443</code>。粘贴含协议和端口的完整 URL 时会自动解析并填充各字段。</td></tr>
               <tr><td>Emby 用户名 / 密码</td><td>用于登录 Emby 账户的凭据。</td></tr>
               <tr><td>播放时长</td><td>模拟播放的秒数。留空使用系统默认值。</td></tr>
               <tr><td>用户代理</td><td>发送给 Emby 的 UA 字符串。留空使用系统默认值。</td></tr>
-            </table>
+            </tbody></table>
 
             <div class="card-section-title" style="margin-top:16px;font-size:11px">时间窗口</div>
             <p class="help-para">
@@ -137,17 +137,17 @@
               The <strong>Bot Username</strong> field accepts the bot handle with or without the leading <code>@</code>.
             </p>
             <table class="help-table">
-              <tr><td>Start Command</td><td>Command sent to the bot, default <code>/start</code>. Supports template placeholders. Leave blank to use the default.</td></tr>
+              <tbody><tr><td>Start Command</td><td>Command sent to the bot, default <code>/start</code>. Supports template placeholders. Leave blank to use the default.</td></tr>
               <tr><td>Check-in Button</td><td>Text used to match the inline keyboard button, default <code>签到</code>.</td></tr>
-            </table>
+            </tbody></table>
             <p class="help-para"><strong>Command template placeholders</strong> — embed dynamic content that is randomly generated each run:</p>
             <table class="help-table">
-              <tr><td><code>{word}</code> / <code>{word:N}</code></td><td>N random lowercase letters (default 6)</td></tr>
+              <tbody><tr><td><code>{word}</code> / <code>{word:N}</code></td><td>N random lowercase letters (default 6)</td></tr>
               <tr><td><code>{WORD}</code> / <code>{WORD:N}</code></td><td>N random uppercase letters (default 6)</td></tr>
               <tr><td><code>{num}</code> / <code>{num:N}</code></td><td>N random digits (default 6)</td></tr>
               <tr><td><code>{alpha}</code> / <code>{alpha:N}</code></td><td>N random mixed-case alphanumeric characters (default 8)</td></tr>
               <tr><td><code>{uuid}</code></td><td>Random UUID v4</td></tr>
-            </table>
+            </tbody></table>
             <p class="help-note">Example: <code>/create {word:4}-{num:6}</code> sends as <code>/create abcd-829341</code></p>
 
             <div class="card-section-title" style="margin-top:16px;font-size:11px">Emby Watch (观看)</div>
@@ -156,11 +156,11 @@
               progress every 30 seconds, then marks the session as stopped. Useful for keeping Emby accounts active.
             </p>
             <table class="help-table">
-              <tr><td>Server URL</td><td>Full address of the Emby server, e.g. <code>https://emby.example.com:443</code>. Paste a URL with protocol and port and the fields are auto-filled.</td></tr>
+              <tbody><tr><td>Server URL</td><td>Full address of the Emby server, e.g. <code>https://emby.example.com:443</code>. Paste a URL with protocol and port and the fields are auto-filled.</td></tr>
               <tr><td>Emby Username / Password</td><td>Credentials for the Emby account to log in as.</td></tr>
               <tr><td>Play Duration</td><td>Seconds to simulate playback. Blank uses the system default.</td></tr>
               <tr><td>User Agent</td><td>Browser UA string sent to Emby. Blank uses the system default.</td></tr>
-            </table>
+            </tbody></table>
 
             <div class="card-section-title" style="margin-top:16px;font-size:11px">Schedule Window</div>
             <p class="help-para">
@@ -189,13 +189,13 @@
           <template v-if="locale === 'zh'">
             <div class="card-section-title">设置</div>
             <table class="help-table">
-              <tr><td>默认时区</td><td>用于计算所有任务的时间窗口。</td></tr>
+              <tbody><tr><td>默认时区</td><td>用于计算所有任务的时间窗口。</td></tr>
               <tr><td>默认最大重试次数</td><td>任务失败后的重试次数。</td></tr>
               <tr><td>每天仅运行一次</td><td>防止任务在 24 小时内重复运行。测试时可关闭。</td></tr>
               <tr><td>默认播放时长</td><td>未在任务中单独设置时，Emby 观看会话的默认时长（秒）。</td></tr>
               <tr><td>设备名称</td><td>发送给 Emby API 的设备标识（如 <code>Mac</code>），Emby 会在客户端旁显示该名称。</td></tr>
               <tr><td>默认用户代理</td><td>未在任务中单独设置时，Emby 观看请求使用的默认 UA 字符串。</td></tr>
-            </table>
+            </tbody></table>
             <p class="help-para" style="margin-top:14px">
               <strong>管理员凭据</strong> -- 随时更改管理员用户名或密码，确认更改时需输入当前密码。
             </p>
@@ -203,13 +203,13 @@
           <template v-else>
             <div class="card-section-title">Settings</div>
             <table class="help-table">
-              <tr><td>Default Timezone</td><td>Used when calculating schedule windows for all jobs.</td></tr>
+              <tbody><tr><td>Default Timezone</td><td>Used when calculating schedule windows for all jobs.</td></tr>
               <tr><td>Default Max Retries</td><td>How many times a failed job attempt is retried.</td></tr>
               <tr><td>Enforce one run per day</td><td>Prevents a job from running more than once in a 24-hour period. Disable during testing.</td></tr>
               <tr><td>Default Play Duration</td><td>Fallback Emby Watch session length in seconds when not set per-job.</td></tr>
               <tr><td>Device Name</td><td>Device identifier sent to the Emby API (e.g. <code>Mac</code>). Emby displays this alongside the client name.</td></tr>
               <tr><td>Default User Agent</td><td>Fallback UA string for Emby Watch requests when not set per-job.</td></tr>
-            </table>
+            </tbody></table>
             <p class="help-para" style="margin-top:14px">
               <strong>Admin Credentials</strong> -- change the admin username or password at any time.
               Current password is always required to confirm the change.

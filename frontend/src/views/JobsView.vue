@@ -180,6 +180,7 @@
               <label class="form-label">
                 {{ t('jobs.labelCheckinButton') }}
                 <span style="color:#aaa;font-weight:400"> — {{ t('common.blankForDefault') }}</span>
+                <div style="font-size:11px;color:#aaa;font-weight:400;margin-top:2px">{{ t('jobs.checkinButtonHint') }}</div>
               </label>
               <input v-model.trim="form.checkinButton" class="form-input" placeholder="签到" />
             </div>

@@ -78,6 +78,7 @@ try {
   const cols = db.prepare('PRAGMA table_info(jobs)').all() as Array<{ name: string; notnull: number }>;
   if (cols.find(c => c.name === 'account_id')?.notnull === 1) {
     db.exec(`
+      DROP TABLE IF EXISTS jobs_v2;
       CREATE TABLE jobs_v2 (
         id                    INTEGER PRIMARY KEY AUTOINCREMENT,
         name                  TEXT    NOT NULL,
