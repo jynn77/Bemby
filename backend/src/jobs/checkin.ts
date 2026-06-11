@@ -88,8 +88,8 @@ async function selectButtonWithAI(buttons: string[][], html: string, image: stri
   const apiKey = getAiSetting('ai_api_key', 'QWEN_API_KEY', '');
   if (!apiKey) throw new Error('{aiBtn} requires an AI API key — configure it in Settings');
 
-  const baseUrl = getAiSetting('ai_base_url', 'QWEN_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1').replace(/\/$/, '');
-  const model = getAiSetting('ai_model', 'QWEN_MODEL', 'qwen-vl-max-latest');
+  const baseUrl = getAiSetting('ai_base_url', 'QWEN_BASE_URL', 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+  const model = getAiSetting('ai_model', 'QWEN_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free');
 
   const flat = buttons.flat();
   const text = htmlToText(html);
