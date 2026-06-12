@@ -233,7 +233,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { jobsApi, accountsApi, statusApi, settingsApi, logsApi, type Job, type Account, type ScheduleStatus, type Settings, type EmbywatchConfig } from '../api/client';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 
 const jobs = ref<Job[]>([]);
 const accounts = ref<Account[]>([]);
@@ -322,7 +322,8 @@ function fmtWindow(start: number, end: number) {
 }
 
 function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString('en-AU', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const localeMap: Record<string, string> = { en: 'en-AU', zh: 'zh-CN' };
+  return new Date(iso).toLocaleString(localeMap[locale.value] ?? 'en-AU', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 function openAdd() {

@@ -187,7 +187,7 @@ const zh = {
     labelAiApiKey: "API 密钥",
     labelAiModel: "模型",
     labelAiTimeout: "超时（毫秒）",
-    notifySection: "TG 通知",
+    notifySection: "Telegram 通知",
     notifyHint:
       "任务结束时通过关联账户向该 Telegram 用户发送通知。支持用户名、@用户名 或 t.me 链接。",
     labelNotifyUsername: "通知目标",
@@ -396,7 +396,7 @@ const en: typeof zh = {
     labelAiApiKey: "API Key",
     labelAiModel: "Model",
     labelAiTimeout: "Timeout (ms)",
-    notifySection: "TG Notifications",
+    notifySection: "Telegram Notifications",
     notifyHint:
       "Send a notification to this Telegram user via the job's linked account when a job finishes. Accepts username, @username, or a t.me link.",
     labelNotifyUsername: "Notification target",
