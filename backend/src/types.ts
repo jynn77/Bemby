@@ -1,5 +1,5 @@
 export type AuthStatus = 'unauthenticated' | 'pending_code' | 'pending_2fa' | 'authenticated';
-export type JobType = 'checkin' | 'embywatch';
+export type JobType = 'checkin' | 'embywatch' | 'custom';
 export type LogStatus = 'success' | 'failed' | 'running';
 
 export type TgAccount = {
@@ -31,6 +31,30 @@ export type Job = {
   config: string | null;
   startCommand: string;
   checkinButton: string;
+};
+
+export type CustomAction =
+  | { type: 'send_command'; content: string }
+  | { type: 'wait_reply'; maxWaitMs: number }
+  | { type: 'delay'; waitMs: number }
+  | { type: 'click_button'; button: string; maxRetries: number; maxWaitMs: number };
+
+export type CustomConfig = {
+  actions: CustomAction[];
+};
+
+export type CustomStepLog = {
+  step: number;
+  actionType: string;
+  label: string;
+  /** Bot response rendered as HTML */
+  responseHtml?: string;
+  responseImage?: string;
+  responseButtons?: string[][];
+  callbackAnswer?: string;
+  result?: string;
+  error?: string;
+  durationMs?: number;
 };
 
 export type EmbywatchConfig = {

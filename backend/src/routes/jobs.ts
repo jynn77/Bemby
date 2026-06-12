@@ -96,13 +96,11 @@ router.post("/", (req, res) => {
   } = req.body as Record<string, any>;
 
   const resolvedType = jobType ?? "checkin";
-  if (!name || (resolvedType === "checkin" && !accountId) || !botUsername) {
-    res
-      .status(400)
-      .json({
-        error:
-          "name and botUsername are required; accountId is required for checkin jobs",
-      });
+  const needsAccount = resolvedType === "checkin" || resolvedType === "custom";
+  if (!name || (needsAccount && !accountId) || !botUsername) {
+    res.status(400).json({
+      error: "name and botUsername are required; accountId is required for checkin and custom jobs",
+    });
     return;
   }
 

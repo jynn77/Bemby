@@ -46,12 +46,35 @@ export type EmbywatchConfig = {
   markWatched?: boolean;
 };
 
+export type CustomAction =
+  | { type: 'send_command'; content: string }
+  | { type: 'wait_reply'; maxWaitMs: number }
+  | { type: 'delay'; waitMs: number }
+  | { type: 'click_button'; button: string; maxRetries: number; maxWaitMs: number };
+
+export type CustomConfig = {
+  actions: CustomAction[];
+};
+
+export type CustomStepLog = {
+  step: number;
+  actionType: string;
+  label: string;
+  responseHtml?: string;
+  responseImage?: string;
+  responseButtons?: string[][];
+  callbackAnswer?: string;
+  result?: string;
+  error?: string;
+  durationMs?: number;
+};
+
 export type Job = {
   id: number;
   name: string;
   accountId: number | null;
   accountName?: string;
-  jobType: "checkin" | "embywatch";
+  jobType: "checkin" | "embywatch" | "custom";
   /** checkin: Telegram bot username. embywatch: Emby server URL */
   botUsername: string;
   scheduleWindowStart: number;
@@ -105,7 +128,7 @@ export type Log = {
   ranAt: string;
   status: "success" | "failed" | "running";
   message: string | null;
-  detail?: CheckinAttemptLog[] | EmbywatchLog[] | null;
+  detail?: CheckinAttemptLog[] | EmbywatchLog[] | { steps: CustomStepLog[] } | null;
 };
 
 export type ScheduleStatus = {

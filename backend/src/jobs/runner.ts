@@ -1,8 +1,9 @@
 import type { Job, TgAccount, EmbywatchConfig, EmbywatchLog } from '../types';
 import { runCheckin, CheckinError, type CheckinAttemptLog } from './checkin';
 import { runEmbywatch } from './embywatch';
+import { runCustom, type CustomJobLog } from './custom';
 
-export type JobDetailLog = CheckinAttemptLog | EmbywatchLog;
+export type JobDetailLog = CheckinAttemptLog | EmbywatchLog | CustomJobLog;
 
 const RETRY_DELAY_MS = 5_000;
 
@@ -43,6 +44,17 @@ export async function runJob(
           if (!config.username || !config.password) throw new Error('Emby username and password are required');
           const log = await runEmbywatch(job.botUsername, config);
           detailLogs?.push(log);
+          break;
+        }
+        case 'custom': {
+          if (!account) throw new Error('No account linked to this job');
+          if (!account.sessionString) throw new Error('Account has no session -- authenticate first');
+          const rawCfg = JSON.parse(job.config ?? '{"actions":[]}');
+          const customLog = await runCustom(
+            account.apiId, account.apiHash, account.sessionString,
+            job.botUsername, rawCfg, signal,
+          );
+          detailLogs?.push(customLog);
           break;
         }
         default:

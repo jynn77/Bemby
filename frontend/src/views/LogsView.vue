@@ -124,6 +124,46 @@
                 </td>
               </tr>
 
+              <!-- Detail panel — custom jobs: step-by-step timeline -->
+              <tr v-if="l.jobType === 'custom' && expandedId === l.id">
+                <td colspan="5" style="padding:0;background:#f8f9fa;border-top:none">
+                  <div style="padding:16px 20px">
+                    <div v-if="detailLoading" style="color:#888;font-size:13px">{{ t('logs.detail.loading') }}</div>
+                    <div v-else-if="!customDetail?.length" style="color:#888;font-size:13px">{{ t('logs.detail.noDetail') }}</div>
+                    <div v-else class="custom-steps">
+                      <div v-for="s in customDetail" :key="s.step" class="custom-step" :class="s.error ? 'custom-step-error' : ''">
+                        <div class="custom-step-header">
+                          <span class="custom-step-num">{{ s.step }}</span>
+                          <span class="custom-step-label">{{ s.label || s.actionType }}</span>
+                          <span v-if="s.durationMs != null" class="custom-step-duration">{{ s.durationMs }}ms</span>
+                          <span v-if="s.error" class="badge badge-red" style="font-size:10px">failed</span>
+                          <span v-else-if="s.result" class="badge badge-green" style="font-size:10px">ok</span>
+                        </div>
+                        <div v-if="s.callbackAnswer" class="custom-step-callback">{{ s.callbackAnswer }}</div>
+                        <div v-if="s.responseHtml" class="chat-bg" style="margin-top:6px">
+                          <div class="chat-log">
+                            <div class="chat-row-recv">
+                              <div class="bubble-recv" v-html="s.responseHtml" />
+                            </div>
+                            <div v-if="s.responseImage" class="chat-row-recv">
+                              <img :src="s.responseImage" style="max-width:240px;border-radius:8px;margin-top:4px" />
+                            </div>
+                            <div v-if="s.responseButtons?.length" class="chat-row-recv">
+                              <div class="bubble-buttons">
+                                <span v-for="(row, ri) in s.responseButtons" :key="ri" class="btn-row">
+                                  <span v-for="(btn, bi) in row" :key="bi" class="tg-btn">{{ btn }}</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div v-if="s.error" class="chat-error" style="margin-top:4px">{{ s.error }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+
               <!-- Detail panel — embywatch jobs: playback summary -->
               <tr v-if="l.jobType === 'embywatch' && expandedId === l.id">
                 <td colspan="5" style="padding:0;background:#f8f9fa;border-top:none">
@@ -181,7 +221,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { logsApi, jobsApi, type Log, type Job, type CheckinAttemptLog, type EmbywatchLog } from '../api/client';
+import { logsApi, jobsApi, type Log, type Job, type CheckinAttemptLog, type EmbywatchLog, type CustomStepLog } from '../api/client';
 import { t } from '../i18n';
 
 const logs = ref<Log[]>([]);
@@ -206,6 +246,13 @@ const checkinDetail = computed(() => {
 const embywatchDetail = computed(() => {
   if (!expandedDetail.value?.length) return null;
   if ('itemType' in expandedDetail.value[0]) return expandedDetail.value[0] as EmbywatchLog;
+  return null;
+});
+
+const customDetail = computed(() => {
+  if (!expandedDetail.value) return null;
+  const d = expandedDetail.value as any;
+  if ('steps' in d && Array.isArray(d.steps)) return d.steps as CustomStepLog[];
   return null;
 });
 
@@ -510,5 +557,66 @@ function fmtSeconds(s: number): string {
   color: #1a7f37;
   border-color: #9ad79a;
   font-weight: 600;
+}
+
+/* Custom job step timeline */
+.custom-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 560px;
+}
+
+.custom-step {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #fff;
+}
+
+.custom-step-error {
+  border-color: #fca5a5;
+  background: #fff5f5;
+}
+
+.custom-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.custom-step-num {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.custom-step-label {
+  flex: 1;
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.custom-step-duration {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.custom-step-callback {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #555;
+  background: #f0f4ff;
+  border-radius: 4px;
+  padding: 4px 8px;
 }
 </style>

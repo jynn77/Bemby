@@ -73,6 +73,15 @@ export function expandCommand(template: string): string {
   });
 }
 
+// ── Shared Telegram helpers (also used by custom.ts) ─────────────────────────
+
+export type ParsedMessages = {
+  html: string;
+  hasMedia: boolean;
+  image?: string;
+  buttons: string[][];
+};
+
 // ── AI button selection via Qwen3-VL ─────────────────────────────────────────
 
 // Strips HTML tags to plain text for the AI prompt
@@ -85,7 +94,23 @@ function getAiSetting(key: string, fallbackEnv: string, defaultVal: string): str
   return rows?.value || process.env[fallbackEnv] || defaultVal;
 }
 
-async function selectButtonWithAI(buttons: string[][], html: string, image: string | undefined): Promise<string> {
+/** Returns true if the value is an aiBtn placeholder (with or without hint) */
+export function isAiBtn(val: string): boolean {
+  return val === '{aiBtn}' || /^\{aiBtn:.+\}$/.test(val);
+}
+
+/** Extracts the hint from {aiBtn:hint}, returns undefined for plain {aiBtn} */
+export function parseAiBtnHint(val: string): string | undefined {
+  const m = val.match(/^\{aiBtn:(.+)\}$/);
+  return m ? m[1].trim() : undefined;
+}
+
+export async function selectButtonWithAI(
+  buttons: string[][],
+  html: string,
+  image: string | undefined,
+  hint?: string,
+): Promise<string> {
   const apiKey = getAiSetting('ai_api_key', 'QWEN_API_KEY', '');
   if (!apiKey) throw new Error('{aiBtn} requires an AI API key — configure it in Settings');
 
@@ -94,7 +119,8 @@ async function selectButtonWithAI(buttons: string[][], html: string, image: stri
 
   const flat = buttons.flat();
   const text = htmlToText(html);
-  const prompt = `A Telegram bot sent a message asking for a daily check-in action.\n\nMessage text:\n${text}\n\nAvailable inline buttons: ${JSON.stringify(flat)}\n\nWhich button should be clicked to complete the daily check-in? Reply with ONLY the exact button text from the list, nothing else.`;
+  const task = hint ?? 'complete the daily check-in';
+  const prompt = `A Telegram bot sent a message. Task: "${task}".\n\nMessage text:\n${text}\n\nAvailable inline buttons: ${JSON.stringify(flat)}\n\nWhich button should be clicked to ${task}? Reply with ONLY the exact button text from the list, nothing else.`;
 
   const content: object[] = [];
   if (image) content.push({ type: 'image_url', image_url: { url: image } });
@@ -198,15 +224,8 @@ function webpageToHtml(wp: Api.WebPage): string {
   return html;
 }
 
-type ParsedMessages = {
-  html: string;
-  hasMedia: boolean;
-  image?: string;
-  buttons: string[][];
-};
-
 // Extracts display data from a set of bot messages
-async function parseMessages(
+export async function parseMessages(
   messages: Api.Message[],
   client: TelegramClient,
   signal?: AbortSignal,
@@ -294,7 +313,7 @@ function waitForBotReply(
 // Watches for an in-place edit of a specific message (bot edits the original reply).
 // Uses raw Telegram updates since GramJS has no dedicated EditedMessage event.
 // Never rejects -- resolves null on timeout or abort.
-function waitForBotMessageEdit(
+export function waitForBotMessageEdit(
   client: TelegramClient,
   originalMsgId: number,
   maxMs: number,
@@ -329,7 +348,7 @@ function waitForBotMessageEdit(
 
 // Waits for any new message from the bot within the given timeout.
 // Never rejects -- resolves null on timeout or abort.
-function waitForNewBotMessage(
+export function waitForNewBotMessage(
   client: TelegramClient,
   botUsername: string,
   maxMs: number,
@@ -424,9 +443,10 @@ export async function runCheckin(
       if (!flat.length) throw new Error('No buttons available for {anyBtn}');
       targetText = flat[Math.floor(Math.random() * flat.length)];
       useExactMatch = true;
-    } else if (checkinButton === '{aiBtn}') {
+    } else if (isAiBtn(checkinButton)) {
       const aiStart = Date.now();
-      targetText = await selectButtonWithAI(log.availableButtons, log.commandResponseHtml, log.commandResponseImage);
+      const hint = parseAiBtnHint(checkinButton);
+      targetText = await selectButtonWithAI(log.availableButtons, log.commandResponseHtml, log.commandResponseImage, hint);
       log.aiDurationMs = Date.now() - aiStart;
       useExactMatch = true;
     } else {
@@ -473,7 +493,7 @@ export async function runCheckin(
       if (clicked) break;
     }
 
-    const notFoundLabel = checkinButton === '{aiBtn}' ? `{aiBtn} -> "${targetText}"` : `"${checkinButton}"`;
+    const notFoundLabel = isAiBtn(checkinButton) ? `{aiBtn} -> "${targetText}"` : `"${checkinButton}"`;
     if (!clicked) throw new Error(`Button ${notFoundLabel} not found in bot reply`);
 
     return log;
