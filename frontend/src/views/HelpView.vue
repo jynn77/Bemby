@@ -208,6 +208,8 @@
               <tr><td>设备名称</td><td>发送给 Emby API 的设备标识（如 <code>Mac</code>），Emby 会在客户端旁显示该名称。</td></tr>
               <tr><td>默认用户代理</td><td>未在任务中单独设置时，Emby 观看请求使用的默认 UA 字符串。</td></tr>
               <tr><td>AI 按钮识别</td><td>配置用于 <code>{aiBtn}</code> 功能的 API 地址、密钥、模型和超时。支持任意 OpenAI 兼容接口（如 OpenRouter）。</td></tr>
+              <tr><td>通知目标用户名</td><td>接收通知的 Telegram 用户名，接受 <code>username</code>、<code>@username</code> 或 <code>https://t.me/username</code>。未填写时发至账户"收藏夹"。</td></tr>
+              <tr><td>通知触发时机</td><td>选择触发通知的事件：失败（默认）和/或成功，可多选。</td></tr>
             </tbody></table>
             <p class="help-para" style="margin-top:14px">
               <strong>管理员凭据</strong> -- 随时更改管理员用户名或密码，确认更改时需输入当前密码。
@@ -223,6 +225,8 @@
               <tr><td>Device Name</td><td>Device identifier sent to the Emby API (e.g. <code>Mac</code>). Emby displays this alongside the client name.</td></tr>
               <tr><td>Default User Agent</td><td>Fallback UA string for Emby Watch requests when not set per-job.</td></tr>
               <tr><td>AI Button Detection</td><td>Configure the API base URL, key, model, and timeout for the <code>{aiBtn}</code> feature. Any OpenAI-compatible provider works (e.g. OpenRouter).</td></tr>
+              <tr><td>TG Notification Target</td><td>Telegram username to receive notifications. Accepts <code>username</code>, <code>@username</code>, or <code>https://t.me/username</code>. Falls back to Saved Messages if not set.</td></tr>
+              <tr><td>Notify On Events</td><td>Which events trigger a notification: failed (default) and/or success. Multi-select.</td></tr>
             </tbody></table>
             <p class="help-para" style="margin-top:14px">
               <strong>Admin Credentials</strong> -- change the admin username or password at any time.
@@ -312,23 +316,35 @@
       <div class="card">
         <div class="card-body">
           <template v-if="locale === 'zh'">
-            <div class="card-section-title">任务失败通知</div>
+            <div class="card-section-title">通知</div>
             <p class="help-para">
-              签到任务失败时（用户主动中止除外），系统会通过该任务关联的 Telegram 账户向其<strong>收藏夹（Saved Messages）</strong>发送通知消息。
+              任务结束时，系统可通过关联的 Telegram 账户向指定目标发送通知。
+              在<strong>设置</strong>页面的"TG 通知"板块配置通知目标和触发时机。
             </p>
+            <table class="help-table">
+              <tbody>
+                <tr><td>通知目标</td><td>接收通知的 Telegram 用户名，接受 <code>username</code>、<code>@username</code> 或 <code>https://t.me/username</code> 格式。未填写时回退到关联账户的"收藏夹"。</td></tr>
+                <tr><td>通知时机</td><td>选择触发通知的事件：<strong>任务失败</strong>（默认勾选）和/或<strong>任务成功</strong>，可多选。</td></tr>
+              </tbody>
+            </table>
             <p class="help-note">
-              Telegram 对发送到自己收藏夹的消息不推送通知。若需要接收推送提醒，建议将通知目标更改为其他频道或群组（规划中的功能）。
+              用户主动中止的任务不触发失败通知。
             </p>
           </template>
           <template v-else>
-            <div class="card-section-title">Job Failure Notifications</div>
+            <div class="card-section-title">Notifications</div>
             <p class="help-para">
-              When a check-in job fails (user-cancelled jobs excluded), Bemby sends a notification message to the linked
-              Telegram account's own <strong>Saved Messages</strong> chat.
+              After a job completes, Bemby can send a Telegram notification via the linked account.
+              Configure the notification target and trigger events in the <strong>Settings</strong> page under "TG Notifications".
             </p>
+            <table class="help-table">
+              <tbody>
+                <tr><td>Notification Target</td><td>Telegram username to receive notifications. Accepts <code>username</code>, <code>@username</code>, or <code>https://t.me/username</code>. Falls back to the linked account's Saved Messages if not set.</td></tr>
+                <tr><td>Notify On Events</td><td>Which events trigger a notification: <strong>Failed</strong> (default) and/or <strong>Success</strong>. Multi-select.</td></tr>
+              </tbody>
+            </table>
             <p class="help-note">
-              Telegram does not push notifications for messages sent to your own Saved Messages. If you need an audible
-              or banner alert, consider routing notifications to a different chat -- this is a planned improvement.
+              Jobs cancelled by the user do not trigger a failure notification.
             </p>
           </template>
         </div>
