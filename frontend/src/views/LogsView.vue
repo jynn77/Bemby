@@ -85,7 +85,9 @@
                           <div v-if="a.commandResponseHtml || a.hasMedia" class="chat-row-recv">
                             <div>
                               <div class="tg-bubble">
-                                <img v-if="a.commandResponseImage" :src="a.commandResponseImage" class="tg-bubble-img" alt="" />
+                                <template v-if="a.commandResponseImages?.length">
+                                  <img v-for="(src, i) in a.commandResponseImages" :key="i" :src="src" class="tg-bubble-img" alt="" />
+                                </template>
                                 <div v-else-if="a.hasMedia" class="tg-bubble-img-placeholder">📷</div>
                                 <div v-if="a.commandResponseHtml" class="tg-bubble-text" v-html="a.commandResponseHtml" />
                               </div>
@@ -105,11 +107,11 @@
                           <template v-if="showDevLogs && a.aiPrompt != null">
                             <div class="dev-block">
                               <div class="dev-block-label">{{ t('logs.aiPrompt') }}</div>
-                              <img v-if="a.commandResponseImage" :src="a.commandResponseImage" class="dev-block-img" alt="image sent to AI" />
+                              <img v-for="(src, i) in (a.commandResponseImages ?? [])" :key="i" :src="src" class="dev-block-img" alt="image sent to AI" />
                               <pre class="dev-block-pre">{{ a.aiPrompt }}</pre>
                             </div>
                             <div class="dev-block">
-                              <div class="dev-block-label">{{ t('logs.aiResponse') }}</div>
+                              <div class="dev-block-label">{{ t('logs.aiResponse') }}{{ a.aiDurationMs != null ? ` (${(a.aiDurationMs / 1000).toFixed(1)}s)` : '' }}</div>
                               <pre class="dev-block-pre">{{ a.aiResponse }}</pre>
                             </div>
                           </template>
@@ -201,7 +203,7 @@
                             <pre class="dev-block-pre">{{ s.aiPrompt }}</pre>
                           </div>
                           <div class="dev-block" style="margin-top:4px">
-                            <div class="dev-block-label">{{ t('logs.aiResponse') }}</div>
+                            <div class="dev-block-label">{{ t('logs.aiResponse') }}{{ s.aiDurationMs != null ? ` (${(s.aiDurationMs / 1000).toFixed(1)}s)` : '' }}</div>
                             <pre class="dev-block-pre">{{ s.aiResponse }}</pre>
                           </div>
                         </template>

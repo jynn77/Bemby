@@ -9,7 +9,7 @@ export type CheckinAttemptLog = {
   commandSent: string;
   hasMedia: boolean;
   commandResponseHtml: string;
-  commandResponseImage?: string;
+  commandResponseImages?: string[];
   availableButtons: string[][];
   buttonClicked?: string;
   callbackAnswer?: string;
@@ -82,7 +82,8 @@ export function expandCommand(template: string): string {
 export type ParsedMessages = {
   html: string;
   hasMedia: boolean;
-  image?: string;
+  /** All photos in the message group, as base64 data URLs */
+  images: string[];
   buttons: string[][];
 };
 
@@ -114,7 +115,7 @@ type AiSelectionResult = { button: string; prompt: string; response: string };
 export async function selectButtonWithAI(
   buttons: string[][],
   html: string,
-  image: string | undefined,
+  images: string[],
   hint?: string,
 ): Promise<AiSelectionResult> {
   const apiKey = getAiSetting('ai_api_key', 'AI_API_KEY', '');
@@ -125,11 +126,11 @@ export async function selectButtonWithAI(
 
   const flat = buttons.flat();
   const text = htmlToText(html);
-  const task = hint ?? 'pick a button based on the message content.';
-  const prompt = `Task: "${task}".\n\nThe message content:\n${text}\n\nThe available inline buttons are: ${JSON.stringify(flat)}\n\nWhich button should be clicked to ${task}? If you don't know which button, please pick the most likely one. Reply with ONLY the exact button text from the list, nothing else.`;
+  const task = hint ?? ('pick ONE button based on the message' + (images.length ? ' and/or attached image(s).' : ''));
+  const prompt = `Task: "${task}".\n\nThe message:\n${text}\n\nThe available inline buttons are: ${JSON.stringify(flat)}\n\nWhich button should be clicked to ${task}? If you don't know which button, please pick the most likely one. Reply with ONLY the exact button text from the list, nothing else.`;
 
   const content: object[] = [];
-  if (image) content.push({ type: 'image_url', image_url: { url: image } });
+  for (const img of images) content.push({ type: 'image_url', image_url: { url: img } });
   content.push({ type: 'text', text: prompt });
 
   const AI_TIMEOUT_MS = Number(getAiSetting('ai_timeout_ms', 'AI_TIMEOUT_MS', '25000'));
@@ -260,24 +261,26 @@ export async function parseMessages(
     }
   }
 
-  let image: string | undefined;
-  const mediaMsg = messages.find(m => m.media instanceof Api.MessageMediaPhoto);
-  if (mediaMsg?.media instanceof Api.MessageMediaPhoto && !signal?.aborted) {
-    try {
-      const photo = mediaMsg.media.photo;
-      if (photo instanceof Api.Photo) {
-        const mSize = photo.sizes.find(
-          (s): s is Api.PhotoSize => s instanceof Api.PhotoSize && s.type === 'm'
-        ) ?? photo.sizes[1] ?? photo.sizes[0];
-        if (mSize) {
-          const bytes = await client.downloadMedia(mediaMsg, { thumb: mSize }) as Buffer | undefined;
-          if (bytes) image = `data:image/jpeg;base64,${bytes.toString('base64')}`;
+  const images: string[] = [];
+  if (!signal?.aborted) {
+    for (const m of messages) {
+      if (!(m.media instanceof Api.MessageMediaPhoto)) continue;
+      try {
+        const photo = m.media.photo;
+        if (photo instanceof Api.Photo) {
+          const mSize = photo.sizes.find(
+            (s): s is Api.PhotoSize => s instanceof Api.PhotoSize && s.type === 'm'
+          ) ?? photo.sizes[1] ?? photo.sizes[0];
+          if (mSize) {
+            const bytes = await client.downloadMedia(m, { thumb: mSize }) as Buffer | undefined;
+            if (bytes) images.push(`data:image/jpeg;base64,${bytes.toString('base64')}`);
+          }
         }
-      }
-    } catch { /* skip image on error */ }
+      } catch { /* skip image on error */ }
+    }
   }
 
-  return { html, hasMedia, image, buttons };
+  return { html, hasMedia, images, buttons };
 }
 
 // Collects ALL bot messages; resolves when one has buttons, times out otherwise
@@ -421,7 +424,7 @@ export async function runCheckin(
         const parsed = await parseMessages(err.partial, client, signal);
         log.hasMedia = parsed.hasMedia;
         log.commandResponseHtml = parsed.html;
-        log.commandResponseImage = parsed.image;
+        log.commandResponseImages = parsed.images;
         log.availableButtons = parsed.buttons;
       }
       throw err;
@@ -430,7 +433,7 @@ export async function runCheckin(
     const parsed = await parseMessages(messages, client, signal);
     log.hasMedia = parsed.hasMedia;
     log.commandResponseHtml = parsed.html;
-    log.commandResponseImage = parsed.image;
+    log.commandResponseImages = parsed.images;
     log.availableButtons = parsed.buttons;
 
     const buttonsMsg = [...messages].reverse().find(m => m.buttons);
@@ -452,7 +455,7 @@ export async function runCheckin(
     } else if (isAiBtn(checkinButton)) {
       const aiStart = Date.now();
       const hint = parseAiBtnHint(checkinButton);
-      const aiResult = await selectButtonWithAI(log.availableButtons, log.commandResponseHtml, log.commandResponseImage, hint);
+      const aiResult = await selectButtonWithAI(log.availableButtons, log.commandResponseHtml, parsed.images, hint);
       targetText = aiResult.button;
       log.aiDurationMs = Date.now() - aiStart;
       log.aiPrompt = aiResult.prompt;
@@ -492,7 +495,7 @@ export async function runCheckin(
             if (bp.html || bp.hasMedia) {
               log.buttonResponseHtml = bp.html || undefined;
               log.buttonResponseHasMedia = bp.hasMedia || undefined;
-              log.buttonResponseImage = bp.image;
+              log.buttonResponseImage = bp.images[0];
               log.buttonResponseButtons = bp.buttons.length ? bp.buttons : undefined;
             }
           }

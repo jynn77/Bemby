@@ -64,6 +64,7 @@ export type CustomStepLog = {
   durationMs?: number;
   aiPrompt?: string;
   aiResponse?: string;
+  aiDurationMs?: number;
 };
 
 export type EmbywatchConfig = {

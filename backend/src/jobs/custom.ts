@@ -145,7 +145,7 @@ export async function runCustom(
             if (btnMsg) lastButtonsMsg = btnMsg;
             const parsed = await parseMessages(msgs, client, signal);
             step.responseHtml = parsed.html || undefined;
-            step.responseImage = parsed.image;
+            step.responseImage = parsed.images[0];
             step.responseHasMedia = parsed.hasMedia || undefined;
             step.responseButtons = parsed.buttons.length ? parsed.buttons : undefined;
             step.result = `Received ${msgs.length} message(s)`;
@@ -168,6 +168,7 @@ export async function runCustom(
 
             // Use cached buttons message or wait for one
             let buttonsMsg: Api.Message | null = lastButtonsMsg;
+            let preClickImages: string[] = [];
             if (!buttonsMsg) {
               const msgs = await waitForButtonsMessage(client, botUsername, action.maxWaitMs, signal);
               lastMessages = msgs;
@@ -176,7 +177,7 @@ export async function runCustom(
               // Log the bot messages we received while waiting (reply to prior send_command)
               const preParsed = await parseMessages(msgs, client, signal);
               if (preParsed.html) step.preClickHtml = preParsed.html;
-              if (preParsed.image) step.preClickImage = preParsed.image;
+              if (preParsed.images.length) { step.preClickImage = preParsed.images[0]; preClickImages = preParsed.images; }
               if (preParsed.hasMedia) step.preClickHasMedia = preParsed.hasMedia;
               if (preParsed.buttons.length) step.preClickButtons = preParsed.buttons;
             }
@@ -195,16 +196,18 @@ export async function runCustom(
             } else if (isAiBtn(action.button)) {
               const buttons: string[][] = allBtnRows.map((row: any[]) => row.map((b: any) => b.text as string));
               const hint = parseAiBtnHint(action.button);
-              // If buttonsMsg was cached (no fresh parse), parse it now so we have HTML + image for AI
-              if (!step.preClickHtml && !step.preClickImage) {
+              // If buttonsMsg was cached (no fresh parse), parse it now so we have HTML + images for AI
+              if (!step.preClickHtml && !preClickImages.length) {
                 const parsed = await parseMessages([buttonsMsg], client, signal);
                 if (parsed.html) step.preClickHtml = parsed.html;
-                if (parsed.image) step.preClickImage = parsed.image;
+                if (parsed.images.length) { step.preClickImage = parsed.images[0]; preClickImages = parsed.images; }
                 if (parsed.hasMedia) step.preClickHasMedia = parsed.hasMedia;
                 if (parsed.buttons.length) step.preClickButtons = parsed.buttons;
               }
-              const aiResult = await selectButtonWithAI(buttons, step.preClickHtml ?? buttonsMsg.message ?? '', step.preClickImage, hint);
+              const aiStart = Date.now();
+              const aiResult = await selectButtonWithAI(buttons, step.preClickHtml ?? buttonsMsg.message ?? '', preClickImages, hint);
               targetText = aiResult.button;
+              step.aiDurationMs = Date.now() - aiStart;
               step.aiPrompt = aiResult.prompt;
               step.aiResponse = aiResult.response;
               useExactMatch = true;
@@ -252,7 +255,7 @@ export async function runCustom(
                     if (responseMsg.buttons) lastButtonsMsg = responseMsg;
                     const parsed = await parseMessages([responseMsg], client, signal);
                     step.responseHtml = parsed.html || undefined;
-                    step.responseImage = parsed.image;
+                    step.responseImage = parsed.images[0];
                     step.responseHasMedia = parsed.hasMedia || undefined;
                     step.responseButtons = parsed.buttons.length ? parsed.buttons : undefined;
                   }

@@ -75,6 +75,7 @@ export type CustomStepLog = {
   durationMs?: number;
   aiPrompt?: string;
   aiResponse?: string;
+  aiDurationMs?: number;
 };
 
 export type Job = {
@@ -115,7 +116,7 @@ export type CheckinAttemptLog = {
   commandSent: string;
   hasMedia: boolean;
   commandResponseHtml: string;
-  commandResponseImage?: string;
+  commandResponseImages?: string[];
   availableButtons: string[][];
   buttonClicked?: string;
   callbackAnswer?: string;
@@ -128,6 +129,7 @@ export type CheckinAttemptLog = {
   aiResponse?: string;
   error?: string;
 };
+
 
 export type Log = {
   id: number;
