@@ -126,8 +126,8 @@ export async function selectButtonWithAI(
 
   const flat = buttons.flat();
   const text = htmlToText(html);
-  const task = hint ?? ('pick ONE button based on the message' + (images.length ? ' and/or attached image(s).' : ''));
-  const prompt = `Task: "${task}".\n\nThe message:\n${text}\n\nThe available inline buttons are: ${JSON.stringify(flat)}\n\nWhich button should be clicked to ${task}? If you don't know which button, please pick the most likely one. Reply with ONLY the exact button text from the list, nothing else.`;
+  const task = hint ?? ('pick ONE button based on the message' + (images.length ? ' and attached image(s).' : ''));
+  const prompt = `Task: "${task}".\n\nThe message:\n${text}\n\nThe available inline buttons are: ${JSON.stringify(flat)}\n\nWhich button should be clicked to "${task}"? If you don't know which button, please pick the most likely one. You MUST reply with ONLY the EXACT BUTTON TEXT from the available list, nothing else. Do NOT include any thinking logic.`;
 
   const content: object[] = [];
   for (const img of images) content.push({ type: 'image_url', image_url: { url: img } });
