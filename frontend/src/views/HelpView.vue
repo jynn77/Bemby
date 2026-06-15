@@ -113,6 +113,7 @@
               <tr><td>播放时长</td><td>模拟播放的秒数。实际时长会在此基础上随机延长 0–10%。留空使用系统默认值。</td></tr>
               <tr><td>用户代理</td><td>发送给 Emby 的 UA 字符串。留空使用系统默认值。</td></tr>
               <tr><td>播放后标记已看</td><td>播放结束后调用 Emby API 将该剧集/电影标记为已看。默认开启，可按任务单独配置。</td></tr>
+              <tr><td>账号（可选）</td><td>用于发送成功/失败通知的 Telegram 账号。留空则不发送通知。</td></tr>
             </tbody></table>
             <p class="help-note">
               播放从剧集随机 5–10% 处开始，而非从头播放，使行为更接近真实用户。
@@ -146,9 +147,9 @@
               在任务列表中点击任意任务行的<strong>复制</strong>按钮，可将该任务的全部配置预填至新建任务表单，修改名称后保存即可。
             </p>
 
-            <div class="card-section-title" style="margin-top:16px;font-size:11px">账号筛选</div>
+            <div class="card-section-title" style="margin-top:16px;font-size:11px">任务筛选</div>
             <p class="help-para">
-              当系统存在多个账号时，任务列表顶部会显示账号筛选下拉框，可按账号过滤任务。
+              当系统存在多个账号或多个机器人/网址时，任务列表顶部会显示对应的筛选下拉框，可按账号或机器人/网址过滤任务。
             </p>
           </template>
           <template v-else>
@@ -186,6 +187,7 @@
               <tr><td>Play Duration</td><td>Seconds to simulate playback. Actual duration is this value plus a random 0–10% extra. Blank uses the system default.</td></tr>
               <tr><td>User Agent</td><td>Browser UA string sent to Emby. Blank uses the system default.</td></tr>
               <tr><td>Mark as watched</td><td>Calls the Emby PlayedItems API after playback ends to mark the item as watched. On by default; configurable per job.</td></tr>
+              <tr><td>Account (optional)</td><td>Telegram account used to send success/failure notifications. Leave blank to disable notifications for this job.</td></tr>
             </tbody></table>
             <p class="help-note">
               Playback starts at a random position 5–10% into the episode rather than from the beginning, making the session more realistic.
@@ -223,10 +225,10 @@
               The name is pre-filled as "<em>original name</em> (copy)" -- update it and save.
             </p>
 
-            <div class="card-section-title" style="margin-top:16px;font-size:11px">Account Filter</div>
+            <div class="card-section-title" style="margin-top:16px;font-size:11px">Job Filters</div>
             <p class="help-para">
-              When more than one account exists, an account filter dropdown appears at the top of the jobs list,
-              letting you show only jobs that belong to a specific account.
+              When more than one account or bot/URL exists, filter dropdowns appear at the top of the jobs list,
+              letting you show only jobs for a specific account or bot target.
             </p>
           </template>
         </div>
@@ -304,7 +306,7 @@
               使用 <code>{aiBtn}</code> 时，点击气泡下方会显示 <strong>AI · Xms</strong> 标识，表示 AI 选择所用时长。
             </p>
             <p class="help-note">
-              对于状态为<strong>运行中</strong>的任务，详情面板每 2 秒自动刷新。
+              对于状态为<strong>运行中</strong>的任务，详情面板每秒自动刷新，可实时查看步骤进展。
               可点击消息列的<strong>停止</strong>按钮随时中止正在运行的任务。
             </p>
             <p class="help-para" style="margin-top:10px"><strong>Emby 观看任务详情</strong></p>
@@ -315,9 +317,14 @@
 
             <div class="card-section-title" style="margin-top:16px;font-size:11px">开发者日志</div>
             <p class="help-para">
-              日志列表顶部有<strong>显示开发者日志</strong>开关，开启后可在 AI 按钮识别步骤下方看到完整的 AI 请求内容：
-              发送给 AI 的提示词、图片及响应文本，以及响应所用时长。默认关闭。
+              日志列表顶部有<strong>开发者</strong>开关，开启后可查看以下调试信息：
             </p>
+            <ul class="help-steps">
+              <li><strong>签到任务</strong>：TG 连接耗时、等待回复耗时（含配置的超时限制）、按钮 API 调用耗时、按钮响应耗时及来源（原地编辑或新消息）、总耗时、错误类型。</li>
+              <li><strong>自定义任务</strong>：每步收到的消息数（等待回复步骤）、响应来源、重试次数（点击按钮步骤）及错误类型。</li>
+              <li><strong>AI 步骤</strong>：发送给 AI 的提示词、图片及响应文本，以及响应所用时长。</li>
+            </ul>
+            <p class="help-note">默认关闭，调试或调优任务参数时开启。</p>
           </template>
           <template v-else>
             <div class="card-section-title">Logs</div>
@@ -345,7 +352,7 @@
               When <code>{aiBtn}</code> is used, an <strong>AI · Xms</strong> badge appears below the clicked button bubble, showing how long the AI took to pick.
             </p>
             <p class="help-note">
-              While a job is <strong>Running</strong>, the detail panel refreshes automatically every 2 seconds.
+              While a job is <strong>Running</strong>, the detail panel refreshes automatically every second so you can watch steps complete in real time.
               Click the <strong>Stop</strong> button in the message column to cancel a running job at any time.
             </p>
             <p class="help-para" style="margin-top:10px"><strong>Emby Watch detail view</strong></p>
@@ -356,10 +363,14 @@
 
             <div class="card-section-title" style="margin-top:16px;font-size:11px">Developer Logs</div>
             <p class="help-para">
-              Toggle <strong>Show developer logs</strong> at the top of the log list to reveal the full AI request
-              detail for any AI button selection step: the prompt sent, the image(s) included, the model's response,
-              and how long the request took. Off by default.
+              Toggle <strong>DEV</strong> at the top of the log list to reveal additional diagnostic data:
             </p>
+            <ul class="help-steps">
+              <li><strong>Check-in jobs</strong>: TG connect time, reply latency (with the configured timeout limit for comparison), button click API time, button response time and source (edited message or new message), total attempt duration, and error type on failure.</li>
+              <li><strong>Custom jobs</strong>: per-step metadata including message count received (wait-reply steps), response source and retry count (click-button steps), and error type.</li>
+              <li><strong>AI steps</strong>: the full prompt sent, any image(s) included, the model's response, and how long the AI request took.</li>
+            </ul>
+            <p class="help-note">Off by default. Enable when debugging failures or tuning timeout and retry settings.</p>
           </template>
         </div>
       </div>

@@ -115,7 +115,7 @@ router.post("/", (req, res) => {
     )
     .run(
       name,
-      resolvedType === "embywatch" ? null : Number(accountId),
+      accountId ? Number(accountId) : null,
       resolvedType,
       (botUsername as string).replace(/^@+/, ""),
       Number(scheduleWindowStart ?? 1400),
@@ -175,9 +175,7 @@ router.put("/:id", (req, res) => {
   `,
   ).run(
     name ?? existing.name,
-    updatedType === "embywatch"
-      ? null
-      : Number(accountId ?? existing.account_id),
+    accountId !== undefined ? (accountId ? Number(accountId) : null) : (existing.account_id ?? null),
     updatedType,
     (botUsername as string | undefined)?.replace(/^@+/, "") ?? existing.bot_username,
     Number(scheduleWindowStart ?? existing.schedule_window_start),
@@ -242,6 +240,23 @@ router.post("/:id/run", async (req, res) => {
       authStatus: accountRow.auth_status as TgAccount["authStatus"],
       createdAt: accountRow.created_at,
     };
+  } else if (job.accountId) {
+    // Optional linked account (e.g. embywatch) — used for notifications only; don't block if not authenticated
+    const accountRow = db
+      .prepare("SELECT * FROM tg_accounts WHERE id = ?")
+      .get(job.accountId) as AccountRow | undefined;
+    if (accountRow?.session_string) {
+      account = {
+        id: accountRow.id,
+        name: accountRow.name,
+        phoneNumber: accountRow.phone_number,
+        apiId: accountRow.api_id,
+        apiHash: accountRow.api_hash,
+        sessionString: accountRow.session_string,
+        authStatus: accountRow.auth_status as TgAccount["authStatus"],
+        createdAt: accountRow.created_at,
+      };
+    }
   }
 
   const ranAt = new Date().toISOString();

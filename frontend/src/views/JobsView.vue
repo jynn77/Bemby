@@ -180,6 +180,16 @@
             </label>
             <div style="font-size:11px;color:#aaa;margin-top:4px;padding-left:24px">{{ t('jobs.markWatchedHint') }}</div>
           </div>
+          <div v-if="accounts.length > 0" class="form-group" style="margin-top:8px">
+            <label class="form-label">
+              {{ t('jobs.labelAccount') }}
+              <span style="color:#aaa;font-weight:400"> — {{ t('jobs.accountOptionalHint') }}</span>
+            </label>
+            <select v-model="form.accountId" class="form-select">
+              <option :value="null">{{ t('jobs.noAccount') }}</option>
+              <option v-for="a in accounts" :key="a.id" :value="a.id">{{ a.name }}</option>
+            </select>
+          </div>
         </template>
 
         <!-- Custom: account + target bot -->
