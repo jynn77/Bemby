@@ -22,7 +22,7 @@
             <tr>
               <th>{{ t('logs.colTime') }}</th>
               <th>{{ t('logs.colJob') }}</th>
-              <th>{{ t('logs.colAccount') }}</th>
+              <th class="col-hide-mobile">{{ t('logs.colAccount') }}</th>
               <th>{{ t('logs.colStatus') }}</th>
               <th>{{ t('logs.colMessage') }}</th>
             </tr>
@@ -42,7 +42,7 @@
                   {{ l.jobName ?? l.jobId }}
                   <span style="margin-left:4px;font-size:11px;color:#aaa">▾</span>
                 </td>
-                <td>{{ l.accountName ?? '—' }}</td>
+                <td class="col-hide-mobile">{{ l.accountName ?? '—' }}</td>
                 <td><span :class="statusBadge(l.status)">{{ t(`logs.status.${l.status}`) }}</span></td>
                 <td style="max-width:320px">
                   <div style="display:flex;align-items:center;gap:8px">

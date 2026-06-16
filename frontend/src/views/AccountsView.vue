@@ -13,7 +13,7 @@
               <th>{{ t('common.name') }}</th>
               <th>{{ t('accounts.colPhone') }}</th>
               <th>{{ t('accounts.colStatus') }}</th>
-              <th>{{ t('accounts.colAdded') }}</th>
+              <th class="col-hide-mobile">{{ t('accounts.colAdded') }}</th>
               <th>{{ t('common.actions') }}</th>
             </tr>
           </thead>
@@ -25,7 +25,7 @@
               <td>{{ a.name }}</td>
               <td>{{ a.phoneNumber }}</td>
               <td><span :class="statusBadge(a.authStatus)">{{ t(`accounts.status.${a.authStatus}`) }}</span></td>
-              <td>{{ fmtDate(a.createdAt) }}</td>
+              <td class="col-hide-mobile">{{ fmtDate(a.createdAt) }}</td>
               <td>
                 <div class="actions">
                   <button

@@ -157,6 +157,7 @@ body {
 	flex: 1;
 	padding: 28px;
 	overflow-y: auto;
+	min-width: 0; /* prevent flex child from overflowing viewport */
 }
 
 /* ── Page header ────────────────────────────────────────────────────────────── */
@@ -476,6 +477,13 @@ tr:hover td {
 	color: #fff;
 }
 
+/* ── Mobile-only / desktop-only visibility helpers ───────────────────────────── */
+
+/* hidden on mobile, visible on desktop */
+.show-mobile {
+	display: none;
+}
+
 /* ── Mobile header ───────────────────────────────────────────────────────────── */
 
 .mobile-header {
@@ -591,6 +599,65 @@ tr:hover td {
 
 	.main {
 		padding: 16px;
+	}
+
+	.page-header {
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	th,
+	td {
+		padding: 8px 10px;
+	}
+
+	.form-row {
+		grid-template-columns: 1fr;
+	}
+
+	.actions {
+		gap: 4px;
+	}
+
+	.card-body {
+		padding: 16px;
+	}
+
+	.modal {
+		padding: 20px;
+	}
+
+	.empty {
+		padding: 32px 16px;
+	}
+
+	.col-hide-mobile {
+		display: none;
+	}
+
+	.hide-mobile {
+		display: none !important;
+	}
+
+	.show-mobile {
+		display: inline-flex !important;
+	}
+
+	/* pin modal to top so footer is never hidden behind browser chrome */
+	.modal-backdrop {
+		align-items: flex-start;
+		padding: 12px;
+	}
+
+	.modal {
+		/* svh = small viewport height, always excludes address bar + nav bar */
+		max-height: calc(100vh - 80px); /* fallback for older browsers */
+		max-height: calc(100svh - 24px);
+	}
+
+	/* keep Save/Cancel above the iOS home indicator */
+	.modal-footer {
+		padding-bottom: max(4px, env(safe-area-inset-bottom));
 	}
 }
 

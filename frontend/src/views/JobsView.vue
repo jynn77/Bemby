@@ -42,8 +42,8 @@
               <th class="th-sort" :class="sortKey === 'name' ? 'sort-active' : ''" @click="setSort('name')">{{ t('common.name') }} <span class="sort-icon">{{ sortIcon('name') }}</span></th>
               <th class="th-sort" :class="sortKey === 'account' ? 'sort-active' : ''" @click="setSort('account')">{{ t('jobs.colAccount') }} <span class="sort-icon">{{ sortIcon('account') }}</span></th>
               <th class="th-sort" :class="sortKey === 'type' ? 'sort-active' : ''" @click="setSort('type')">{{ t('jobs.colType') }} <span class="sort-icon">{{ sortIcon('type') }}</span></th>
-              <th class="th-sort" :class="sortKey === 'botUrl' ? 'sort-active' : ''" @click="setSort('botUrl')">{{ t('jobs.colBotUrl') }} <span class="sort-icon">{{ sortIcon('botUrl') }}</span></th>
-              <th class="th-sort" :class="sortKey === 'window' ? 'sort-active' : ''" @click="setSort('window')">{{ t('jobs.colWindow') }} <span class="sort-icon">{{ sortIcon('window') }}</span></th>
+              <th class="th-sort col-hide-mobile" :class="sortKey === 'botUrl' ? 'sort-active' : ''" @click="setSort('botUrl')">{{ t('jobs.colBotUrl') }} <span class="sort-icon">{{ sortIcon('botUrl') }}</span></th>
+              <th class="th-sort col-hide-mobile" :class="sortKey === 'window' ? 'sort-active' : ''" @click="setSort('window')">{{ t('jobs.colWindow') }} <span class="sort-icon">{{ sortIcon('window') }}</span></th>
               <th class="th-sort" :class="sortKey === 'enabled' ? 'sort-active' : ''" @click="setSort('enabled')">{{ t('jobs.colEnabled') }} <span class="sort-icon">{{ sortIcon('enabled') }}</span></th>
               <th>{{ t('common.actions') }}</th>
             </tr>
@@ -61,8 +61,8 @@
               <td>{{ j.name }}</td>
               <td>{{ j.accountName ?? j.accountId }}</td>
               <td><span :class="jobTypeBadge(j.jobType)">{{ t(`logs.jobType.${j.jobType}`) }}</span></td>
-              <td>{{ j.jobType === 'embywatch' ? j.botUsername : '@' + j.botUsername }}</td>
-              <td>{{ fmtWindow(j.scheduleWindowStart, j.scheduleWindowEnd) }}</td>
+              <td class="col-hide-mobile">{{ j.jobType === 'embywatch' ? j.botUsername : '@' + j.botUsername }}</td>
+              <td class="col-hide-mobile">{{ fmtWindow(j.scheduleWindowStart, j.scheduleWindowEnd) }}</td>
               <td>
                 <span
                   :class="j.enabled ? 'badge badge-green' : 'badge badge-grey'"
@@ -73,7 +73,8 @@
                 </span>
               </td>
               <td @click.stop>
-                <div class="actions">
+                <!-- desktop: four icon buttons -->
+                <div class="actions hide-mobile">
                   <button class="btn btn-sm btn-success btn-icon" :disabled="running.has(j.id)" :title="t('common.run')" @click="runNow(j.id)">
                     <i class="fa-solid fa-play"></i>
                   </button>
@@ -81,6 +82,10 @@
                   <button class="btn btn-sm btn-ghost btn-icon" :title="t('common.duplicate')" @click="openDuplicate(j)"><i class="fa-solid fa-copy"></i></button>
                   <button class="btn btn-sm btn-danger btn-icon" :title="t('common.delete')" @click="remove(j.id)"><i class="fa-solid fa-trash"></i></button>
                 </div>
+                <!-- mobile: single button opens action sheet -->
+                <button class="btn btn-sm btn-ghost btn-icon show-mobile" @click="actionMenuJob = j">
+                  <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
               </td>
             </tr>
           </tbody>
@@ -367,6 +372,29 @@
         </div>
       </div>
     </div>
+
+    <!-- Mobile action sheet -->
+    <div v-if="actionMenuJob" class="action-sheet-backdrop" @click="actionMenuJob = null">
+      <div class="action-sheet" @click.stop>
+        <div class="action-sheet-header">{{ actionMenuJob.name }}</div>
+        <button class="action-sheet-btn" :disabled="running.has(actionMenuJob.id)" @click="runNow(actionMenuJob.id); actionMenuJob = null">
+          <i class="fa-solid fa-play"></i> {{ t('common.run') }}
+        </button>
+        <button class="action-sheet-btn" @click="openEdit(actionMenuJob); actionMenuJob = null">
+          <i class="fa-solid fa-pen"></i> {{ t('common.edit') }}
+        </button>
+        <button class="action-sheet-btn" @click="openDuplicate(actionMenuJob); actionMenuJob = null">
+          <i class="fa-solid fa-copy"></i> {{ t('common.duplicate') }}
+        </button>
+        <button class="action-sheet-btn danger" @click="remove(actionMenuJob.id); actionMenuJob = null">
+          <i class="fa-solid fa-trash"></i> {{ t('common.delete') }}
+        </button>
+        <div class="action-sheet-divider"></div>
+        <button class="action-sheet-btn action-sheet-cancel" @click="actionMenuJob = null">
+          {{ t('common.cancel') }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -413,6 +441,7 @@ const botUrlOptions = computed(() => {
 const sortKey = usePersistedRef<string>('bemby:jobs:sortKey', '');
 const sortDir = usePersistedRef<'asc' | 'desc'>('bemby:jobs:sortDir', 'asc');
 const selectedJobId = ref<number | null>(null);
+const actionMenuJob = ref<Job | null>(null);
 
 function setSort(key: string) {
   if (sortKey.value === key) {
@@ -886,5 +915,73 @@ onUnmounted(() => {
 
 .row-selected td {
   background: #eff6ff;
+}
+
+/* ── Mobile action sheet ──────────────────────────────────────────────────────── */
+
+.action-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+}
+
+.action-sheet {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.action-sheet-header {
+  padding: 14px 20px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.action-sheet-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 15px 20px;
+  background: none;
+  border: none;
+  font-size: 15px;
+  color: #1a1a2e;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.action-sheet-btn:not(:disabled):active {
+  background: #f5f5f5;
+}
+
+.action-sheet-btn.danger {
+  color: #e63946;
+}
+
+.action-sheet-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-sheet-divider {
+  height: 1px;
+  background: #f0f0f0;
+  margin: 4px 0;
+}
+
+.action-sheet-cancel {
+  color: #888;
+  font-weight: 500;
 }
 </style>
