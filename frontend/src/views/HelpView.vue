@@ -299,7 +299,7 @@
               <tr><td>设备名称</td><td>发送给 Emby API 的设备标识（如 <code>Mac</code>），Emby 会在客户端旁显示该名称。</td></tr>
               <tr><td>默认用户代理</td><td>未在任务中单独选择时使用的 UA 预设。从已有预设中选择，默认为 SenPlayer (Mac)。</td></tr>
               <tr><td>用户代理预设</td><td>管理可在任务中选用的 UA 预设列表。内置 SenPlayer、Yamby、Hills、Lenna、VidHub 五个预设，可按需添加或删除。</td></tr>
-              <tr><td>AI 按钮识别</td><td>配置用于 <code>{aiBtn}</code> 功能的 API 地址、密钥、模型和超时。支持任意 OpenAI 兼容接口（如 OpenRouter）。</td></tr>
+              <tr><td>AI 服务商</td><td>管理 AI 服务商和模型。全新安装已预置 OpenRouter（<code>https://openrouter.ai/api/v1</code>）及 <code>nvidia/nemotron-nano-12b-v2-vl:free</code> 模型，在此处填入 API 密钥即可启用 <code>{aiBtn}</code>、<code>{aiInput}</code> 和"输入验证码"功能。支持添加任意 OpenAI 兼容服务商。</td></tr>
               <tr><td>通知目标用户名</td><td>接收通知的 Telegram 用户名，接受 <code>username</code>、<code>@username</code> 或 <code>https://t.me/username</code>。未填写时发至账户"收藏夹"。</td></tr>
               <tr><td>通知触发时机</td><td>选择触发通知的事件：失败（默认）和/或成功，可多选。</td></tr>
               <tr><td>账号导出 / 导入</td><td>将 Telegram 会话数据导出为 JSON 文件，可导入至另一 Bemby 实例，无需重新认证。</td></tr>
@@ -318,7 +318,7 @@
               <tr><td>Device Name</td><td>Device identifier sent to the Emby API (e.g. <code>Mac</code>). Emby displays this alongside the client name.</td></tr>
               <tr><td>Default User Agent</td><td>The UA preset used when a job has no UA selected. Pick from the preset list; defaults to SenPlayer (Mac).</td></tr>
               <tr><td>User Agent Presets</td><td>Manage the preset list available in job forms. Five built-in presets (SenPlayer, Yamby, Hills, Lenna, VidHub) — add or remove custom entries as needed.</td></tr>
-              <tr><td>AI Button Detection</td><td>Configure the API base URL, key, model, and timeout for the <code>{aiBtn}</code> feature. Any OpenAI-compatible provider works (e.g. OpenRouter).</td></tr>
+              <tr><td>AI Providers</td><td>Manage AI suppliers and models. A fresh install pre-configures OpenRouter (<code>https://openrouter.ai/api/v1</code>) with the <code>nvidia/nemotron-nano-12b-v2-vl:free</code> model — add your API key here to activate <code>{aiBtn}</code>, <code>{aiInput}</code>, and Enter Captcha. Any OpenAI-compatible provider can be added.</td></tr>
               <tr><td>TG Notification Target</td><td>Telegram username to receive notifications. Accepts <code>username</code>, <code>@username</code>, or <code>https://t.me/username</code>. Falls back to Saved Messages if not set.</td></tr>
               <tr><td>Notify On Events</td><td>Which events trigger a notification: failed (default) and/or success. Multi-select.</td></tr>
               <tr><td>Account Export / Import</td><td>Export Telegram session data as a JSON file. Import it into another Bemby instance to transfer accounts without re-authenticating.</td></tr>

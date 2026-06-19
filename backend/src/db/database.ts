@@ -110,24 +110,20 @@ db.exec(`
   );
 `);
 
-// Seed first supplier from legacy flat settings on first run
+// Seed default OpenRouter supplier on first run; carry over any legacy flat-settings values for upgrades
 try {
   const supplierCount = (db.prepare('SELECT COUNT(*) AS n FROM ai_suppliers').get() as { n: number }).n;
   if (supplierCount === 0) {
     const getSetting = (key: string) =>
       (db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? '';
     const apiKey  = getSetting('ai_api_key');
-    const baseUrl = getSetting('ai_base_url');
-    const model   = getSetting('ai_model');
+    const baseUrl = getSetting('ai_base_url') || 'https://openrouter.ai/api/v1';
+    const model   = getSetting('ai_model')    || 'nvidia/nemotron-nano-12b-v2-vl:free';
     const timeout = getSetting('ai_timeout_ms');
-    if (apiKey || baseUrl) {
-      const { lastInsertRowid } = db.prepare(
-        'INSERT INTO ai_suppliers (name, base_url, api_key, timeout_ms) VALUES (?, ?, ?, ?)'
-      ).run('OpenRouter', baseUrl || 'https://openrouter.ai/api/v1', apiKey, Number(timeout) || 25000);
-      if (model) {
-        db.prepare('INSERT INTO ai_models (supplier_id, model_id) VALUES (?, ?)').run(lastInsertRowid, model);
-      }
-    }
+    const { lastInsertRowid } = db.prepare(
+      'INSERT INTO ai_suppliers (name, base_url, api_key, timeout_ms) VALUES (?, ?, ?, ?)'
+    ).run('OpenRouter', baseUrl, apiKey, Number(timeout) || 25000);
+    db.prepare('INSERT INTO ai_models (supplier_id, model_id) VALUES (?, ?)').run(lastInsertRowid, model);
   }
 } catch (e) { console.error('[db] AI supplier seed failed:', e); }
 

@@ -160,9 +160,12 @@
                 <button class="btn btn-ghost btn-sm btn-danger" @click="removeSupplier(s.id)"><i class="fa-solid fa-trash"></i></button>
               </div>
             </div>
+            <div v-if="editingSupplierId !== s.id && !s.api_key" class="supplier-no-key-warning">
+              <i class="fa-solid fa-triangle-exclamation"></i> {{ t("settings.supplierNoApiKey") }}
+            </div>
 
             <!-- Supplier edit form -->
-            <div v-else class="supplier-edit-form">
+            <div v-if="editingSupplierId === s.id" class="supplier-edit-form">
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label">{{ t("settings.supplierName") }}</label>
@@ -988,6 +991,15 @@ async function saveCredentials() {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.supplier-no-key-warning {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 5px;
+  padding: 5px 10px;
 }
 .supplier-models {
   margin-top: 10px;
