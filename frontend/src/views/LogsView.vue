@@ -282,178 +282,6 @@
                                   >
                                 </div>
                               </div>
-                              <template v-if="a.aiPrompt != null">
-                                <div class="dev-block">
-                                  <div
-                                    class="dev-block-label"
-                                    style="
-                                      display: flex;
-                                      align-items: center;
-                                      justify-content: space-between;
-                                    "
-                                  >
-                                    <span>{{ t("logs.aiPrompt") }}</span>
-                                    <button
-                                      class="btn btn-ghost btn-sm btn-icon debug-open-btn"
-                                      :class="{
-                                        'debug-open-btn-active':
-                                          debugKey ===
-                                          `${expandedId}-attempt-${a.attempt}`,
-                                      }"
-                                      :title="t('logs.debug.open')"
-                                      @click="openDebugCheckin(a)"
-                                    >
-                                      <i class="fa-solid fa-flask"></i>
-                                    </button>
-                                  </div>
-                                  <img
-                                    v-for="(
-                                      src, i
-                                    ) in a.commandResponseImages ?? []"
-                                    :key="i"
-                                    :src="src"
-                                    class="dev-block-img"
-                                    alt="image sent to AI"
-                                  />
-                                  <pre class="dev-block-pre">{{
-                                    a.aiPrompt
-                                  }}</pre>
-                                </div>
-                                <div class="dev-block">
-                                  <div class="dev-block-label">
-                                    {{ t("logs.aiResponse")
-                                    }}{{
-                                      a.aiDurationMs != null
-                                        ? ` (${(a.aiDurationMs / 1000).toFixed(1)}s)`
-                                        : ""
-                                    }}
-                                  </div>
-                                  <pre class="dev-block-pre">{{
-                                    a.aiResponse
-                                  }}</pre>
-                                </div>
-                                <div
-                                  v-if="a.aiRetries?.length"
-                                  class="dev-block"
-                                  style="margin-top: 4px"
-                                >
-                                  <div class="dev-block-label">
-                                    {{ t("logs.aiRetries") }} ({{
-                                      a.aiRetries.length
-                                    }})
-                                  </div>
-                                  <pre class="dev-block-pre">{{
-                                    a.aiRetries
-                                      .map((r, i) => `#${i + 1}: ${r}`)
-                                      .join("\n")
-                                  }}</pre>
-                                </div>
-                                <div
-                                  v-if="
-                                    debugKey ===
-                                    `${expandedId}-attempt-${a.attempt}`
-                                  "
-                                  class="debug-panel"
-                                >
-                                  <div class="debug-panel-title">
-                                    {{ t("logs.debug.title") }}
-                                  </div>
-                                  <img
-                                    v-for="(
-                                      src, i
-                                    ) in a.commandResponseImages ?? []"
-                                    :key="i"
-                                    :src="src"
-                                    class="debug-panel-img"
-                                    alt=""
-                                  />
-                                  <textarea
-                                    v-model="debugPrompt"
-                                    class="debug-panel-textarea"
-                                    rows="5"
-                                    :placeholder="
-                                      t('logs.debug.promptPlaceholder')
-                                    "
-                                  />
-                                  <div class="debug-panel-controls">
-                                    <span class="debug-tokens-label">{{
-                                      t("logs.debug.model")
-                                    }}</span>
-                                    <select
-                                      v-model="debugModel"
-                                      class="form-select debug-model-input"
-                                    >
-                                      <option value="">
-                                        {{ t("logs.debug.modelDefault") }}
-                                      </option>
-                                      <optgroup
-                                        v-for="sup in debugSuppliers"
-                                        :key="sup.id"
-                                        :label="sup.name"
-                                      >
-                                        <option
-                                          v-for="m in sup.models"
-                                          :key="m.id"
-                                          :value="m.model_id"
-                                        >
-                                          {{ m.model_id }}
-                                        </option>
-                                      </optgroup>
-                                    </select>
-                                    <span class="debug-tokens-label">{{
-                                      t("logs.debug.maxTokens")
-                                    }}</span>
-                                    <input
-                                      v-model.number="debugMaxTokens"
-                                      class="form-input debug-tokens-input"
-                                      type="number"
-                                      min="10"
-                                      max="100000"
-                                      step="100"
-                                    />
-                                    <button
-                                      class="btn btn-primary btn-sm"
-                                      :disabled="debugRunning"
-                                      @click="runDebug"
-                                    >
-                                      {{
-                                        debugRunning
-                                          ? t("logs.debug.running")
-                                          : t("logs.debug.run")
-                                      }}
-                                    </button>
-                                    <button
-                                      class="btn btn-ghost btn-sm"
-                                      @click="debugKey = null"
-                                    >
-                                      {{ t("logs.debug.close") }}
-                                    </button>
-                                  </div>
-                                  <div
-                                    v-if="debugResponse != null"
-                                    class="debug-panel-response"
-                                  >
-                                    <div class="dev-block-label">
-                                      {{ t("logs.debug.response")
-                                      }}{{
-                                        debugDurationMs != null
-                                          ? ` (${(debugDurationMs / 1000).toFixed(1)}s)`
-                                          : ""
-                                      }}
-                                    </div>
-                                    <pre class="dev-block-pre">{{
-                                      debugResponse
-                                    }}</pre>
-                                  </div>
-                                  <div
-                                    v-if="debugError"
-                                    class="chat-error"
-                                    style="margin-top: 6px"
-                                  >
-                                    {{ debugError }}
-                                  </div>
-                                </div>
-                              </template>
                             </template>
                             <div
                               v-if="
@@ -511,6 +339,88 @@
                             </div>
                           </div>
                         </div>
+                        <!-- AI debug section outside chat-bg, constrained to match chat-bg width -->
+                        <template v-if="showDevLogs && a.aiPrompt != null">
+                          <div style="max-width: 420px">
+                          <template
+                            v-if="
+                              debugKey !== `${expandedId}-attempt-${a.attempt}`
+                            "
+                          >
+                            <div class="dev-block" style="margin-top: 8px">
+                              <div
+                                class="dev-block-label"
+                                style="
+                                  display: flex;
+                                  align-items: center;
+                                  justify-content: space-between;
+                                "
+                              >
+                                <span>{{ t("logs.aiPrompt") }}</span>
+                                <button
+                                  class="btn btn-ghost btn-sm btn-icon debug-open-btn"
+                                  :title="t('logs.debug.open')"
+                                  @click="openDebugCheckin(a)"
+                                >
+                                  <i class="fa-solid fa-flask"></i>
+                                </button>
+                              </div>
+                              <img
+                                v-for="(src, i) in a.commandResponseImages ??
+                                []"
+                                :key="i"
+                                :src="src"
+                                class="dev-block-img"
+                                alt="image sent to AI"
+                              />
+                              <pre class="dev-block-pre">{{ a.aiPrompt }}</pre>
+                            </div>
+                            <div class="dev-block" style="margin-top: 4px">
+                              <div class="dev-block-label">
+                                {{ t("logs.aiResponse")
+                                }}{{
+                                  a.aiDurationMs != null
+                                    ? ` (${(a.aiDurationMs / 1000).toFixed(1)}s)`
+                                    : ""
+                                }}
+                              </div>
+                              <pre class="dev-block-pre">{{
+                                a.aiResponse
+                              }}</pre>
+                            </div>
+                            <div
+                              v-if="a.aiRetries?.length"
+                              class="dev-block"
+                              style="margin-top: 4px"
+                            >
+                              <div class="dev-block-label">
+                                {{ t("logs.aiRetries") }} ({{
+                                  a.aiRetries.length
+                                }})
+                              </div>
+                              <pre class="dev-block-pre">{{
+                                a.aiRetries
+                                  .map((r, i) => `#${i + 1}: ${r}`)
+                                  .join("\n")
+                              }}</pre>
+                            </div>
+                          </template>
+                          <DebugPanel
+                            v-else
+                            v-model:prompt="debugPrompt"
+                            v-model:model="debugModel"
+                            v-model:max-tokens="debugMaxTokens"
+                            :images="debugImages"
+                            :suppliers="debugSuppliers"
+                            :running="debugRunning"
+                            :response="debugResponse"
+                            :error="debugError"
+                            :duration-ms="debugDurationMs"
+                            @run="runDebug"
+                            @close="debugKey = null"
+                          />
+                          </div>
+                        </template>
                       </div>
                     </div>
                   </div>
@@ -575,18 +485,6 @@
                             style="font-size: 10px"
                             >ok</span
                           >
-                          <button
-                            v-if="s.aiPrompt != null"
-                            class="btn btn-ghost btn-sm btn-icon debug-open-btn"
-                            :class="{
-                              'debug-open-btn-active':
-                                debugKey === `${expandedId}-${sIdx}`,
-                            }"
-                            :title="t('logs.debug.open')"
-                            @click="openDebug(s)"
-                          >
-                            <i class="fa-solid fa-flask"></i>
-                          </button>
                         </div>
                         <!-- Pre-click context: bot message received while waiting for buttons -->
                         <div
@@ -743,130 +641,78 @@
                           {{ s.error }}
                         </div>
                         <template v-if="s.aiPrompt != null">
-                          <div class="dev-block" style="margin-top: 8px">
-                            <div class="dev-block-label">
-                              {{ t("logs.aiPrompt") }}
+                          <template v-if="debugKey !== `${expandedId}-${sIdx}`">
+                            <div class="dev-block" style="margin-top: 8px">
+                              <div
+                                class="dev-block-label"
+                                style="
+                                  display: flex;
+                                  align-items: center;
+                                  justify-content: space-between;
+                                "
+                              >
+                                <span>{{ t("logs.aiPrompt") }}</span>
+                                <button
+                                  class="btn btn-ghost btn-sm btn-icon debug-open-btn"
+                                  :title="t('logs.debug.open')"
+                                  @click="openDebug(s, sIdx)"
+                                >
+                                  <i class="fa-solid fa-flask"></i>
+                                </button>
+                              </div>
+                              <img
+                                v-if="s.preClickImage"
+                                :src="s.preClickImage"
+                                class="dev-block-img"
+                                alt="image sent to AI"
+                              />
+                              <pre class="dev-block-pre">{{ s.aiPrompt }}</pre>
                             </div>
-                            <img
-                              v-if="s.preClickImage"
-                              :src="s.preClickImage"
-                              class="dev-block-img"
-                              alt="image sent to AI"
-                            />
-                            <pre class="dev-block-pre">{{ s.aiPrompt }}</pre>
-                          </div>
-                          <div class="dev-block" style="margin-top: 4px">
-                            <div class="dev-block-label">
-                              {{ t("logs.aiResponse")
-                              }}{{
-                                s.aiDurationMs != null
-                                  ? ` (${(s.aiDurationMs / 1000).toFixed(1)}s)`
-                                  : ""
-                              }}
+                            <div class="dev-block" style="margin-top: 4px">
+                              <div class="dev-block-label">
+                                {{ t("logs.aiResponse")
+                                }}{{
+                                  s.aiDurationMs != null
+                                    ? ` (${(s.aiDurationMs / 1000).toFixed(1)}s)`
+                                    : ""
+                                }}
+                              </div>
+                              <pre class="dev-block-pre">{{
+                                s.aiResponse
+                              }}</pre>
                             </div>
-                            <pre class="dev-block-pre">{{ s.aiResponse }}</pre>
-                          </div>
-                          <div
-                            v-if="s.aiRetries?.length"
-                            class="dev-block"
-                            style="margin-top: 4px"
-                          >
-                            <div class="dev-block-label">
-                              {{ t("logs.aiRetries") }} ({{
-                                s.aiRetries.length
-                              }})
+                            <div
+                              v-if="s.aiRetries?.length"
+                              class="dev-block"
+                              style="margin-top: 4px"
+                            >
+                              <div class="dev-block-label">
+                                {{ t("logs.aiRetries") }} ({{
+                                  s.aiRetries.length
+                                }})
+                              </div>
+                              <pre class="dev-block-pre">{{
+                                s.aiRetries
+                                  .map((r, i) => `#${i + 1}: ${r}`)
+                                  .join("\n")
+                              }}</pre>
                             </div>
-                            <pre class="dev-block-pre">{{
-                              s.aiRetries
-                                .map((r, i) => `#${i + 1}: ${r}`)
-                                .join("\n")
-                            }}</pre>
-                          </div>
+                          </template>
+                          <DebugPanel
+                            v-else
+                            v-model:prompt="debugPrompt"
+                            v-model:model="debugModel"
+                            v-model:max-tokens="debugMaxTokens"
+                            :images="debugImages"
+                            :suppliers="debugSuppliers"
+                            :running="debugRunning"
+                            :response="debugResponse"
+                            :error="debugError"
+                            :duration-ms="debugDurationMs"
+                            @run="runDebug"
+                            @close="debugKey = null"
+                          />
                         </template>
-                        <!-- AI debug / replay panel -->
-                        <div
-                          v-if="
-                            s.aiPrompt != null &&
-                            debugKey === `${expandedId}-${sIdx}`
-                          "
-                          class="debug-panel"
-                        >
-                          <div class="debug-panel-title">
-                            {{ t("logs.debug.title") }}
-                          </div>
-                          <img
-                            v-if="debugImages[0]"
-                            :src="debugImages[0]"
-                            class="debug-panel-img"
-                            alt=""
-                          />
-                          <textarea
-                            v-model="debugPrompt"
-                            class="debug-panel-textarea"
-                            rows="5"
-                            :placeholder="t('logs.debug.promptPlaceholder')"
-                          />
-                          <div class="debug-panel-controls">
-                            <span class="debug-tokens-label">{{
-                              t("logs.debug.model")
-                            }}</span>
-                            <input
-                              v-model="debugModel"
-                              class="form-input debug-model-input"
-                              type="text"
-                              :placeholder="t('logs.debug.model')"
-                            />
-                            <span class="debug-tokens-label">{{
-                              t("logs.debug.maxTokens")
-                            }}</span>
-                            <input
-                              v-model.number="debugMaxTokens"
-                              class="form-input debug-tokens-input"
-                              type="number"
-                              min="10"
-                              max="100000"
-                              step="100"
-                            />
-                            <button
-                              class="btn btn-primary btn-sm"
-                              :disabled="debugRunning"
-                              @click="runDebug"
-                            >
-                              {{
-                                debugRunning
-                                  ? t("logs.debug.running")
-                                  : t("logs.debug.run")
-                              }}
-                            </button>
-                            <button
-                              class="btn btn-ghost btn-sm"
-                              @click="debugKey = null"
-                            >
-                              {{ t("logs.debug.close") }}
-                            </button>
-                          </div>
-                          <div
-                            v-if="debugResponse != null"
-                            class="debug-panel-response"
-                          >
-                            <div class="dev-block-label">
-                              {{ t("logs.debug.response")
-                              }}{{
-                                debugDurationMs != null
-                                  ? ` (${(debugDurationMs / 1000).toFixed(1)}s)`
-                                  : ""
-                              }}
-                            </div>
-                            <pre class="dev-block-pre">{{ debugResponse }}</pre>
-                          </div>
-                          <div
-                            v-if="debugError"
-                            class="chat-error"
-                            style="margin-top: 6px"
-                          >
-                            {{ debugError }}
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -990,6 +836,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import DebugPanel from "../components/DebugPanel.vue";
 import {
   logsApi,
   jobsApi,
@@ -1031,34 +878,34 @@ const debugResponse = ref<string | null>(null);
 const debugError = ref<string | null>(null);
 const debugDurationMs = ref<number | null>(null);
 
-function openDebug(step: CustomStepLog) {
-  const key = `${expandedId.value}-${step.step}`;
+function openDebugPanel(key: string, prompt: string, images: string[]) {
   if (debugKey.value === key) {
     debugKey.value = null;
     return;
   }
   debugKey.value = key;
-  debugPrompt.value = step.aiPrompt ?? "";
-  debugImages.value = step.preClickImage ? [step.preClickImage] : [];
+  debugPrompt.value = prompt;
+  debugImages.value = images;
   debugMaxTokens.value = 5000;
   debugResponse.value = null;
   debugError.value = null;
   debugDurationMs.value = null;
 }
 
+function openDebug(step: CustomStepLog, sIdx: number) {
+  openDebugPanel(
+    `${expandedId.value}-${sIdx}`,
+    step.aiPrompt ?? "",
+    step.preClickImage ? [step.preClickImage] : [],
+  );
+}
+
 function openDebugCheckin(attempt: CheckinAttemptLog) {
-  const key = `${expandedId.value}-attempt-${attempt.attempt}`;
-  if (debugKey.value === key) {
-    debugKey.value = null;
-    return;
-  }
-  debugKey.value = key;
-  debugPrompt.value = attempt.aiPrompt ?? "";
-  debugImages.value = attempt.commandResponseImages ?? [];
-  debugMaxTokens.value = 5000;
-  debugResponse.value = null;
-  debugError.value = null;
-  debugDurationMs.value = null;
+  openDebugPanel(
+    `${expandedId.value}-attempt-${attempt.attempt}`,
+    attempt.aiPrompt ?? "",
+    attempt.commandResponseImages ?? [],
+  );
 }
 
 async function runDebug() {
@@ -1561,7 +1408,6 @@ function fmtSeconds(s: number): string {
   background: #1e1e2e;
   border-radius: 8px;
   padding: 8px 12px;
-  max-width: 420px;
 }
 
 .dev-block-label {
@@ -1699,76 +1545,5 @@ function fmtSeconds(s: number): string {
 .debug-open-btn-active {
   opacity: 1;
   color: #89b4fa;
-}
-
-.debug-panel {
-  margin-top: 10px;
-  padding: 10px 12px;
-  background: #12122a;
-  border: 1px solid #2d2d5c;
-  border-radius: 6px;
-}
-
-.debug-panel-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: #89b4fa;
-  margin-bottom: 8px;
-}
-
-.debug-panel-img {
-  display: block;
-  max-height: 90px;
-  max-width: 100%;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  opacity: 0.9;
-}
-
-.debug-panel-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: #1e1e2e;
-  border: 1px solid #45475a;
-  border-radius: 4px;
-  color: #cdd6f4;
-  font-size: 12px;
-  font-family: monospace;
-  padding: 8px;
-  line-height: 1.5;
-  resize: vertical;
-}
-
-.debug-panel-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-.debug-tokens-label {
-  font-size: 11px;
-  color: #9399b2;
-  white-space: nowrap;
-}
-
-.debug-tokens-input {
-  width: 80px !important;
-  padding: 4px 8px !important;
-  font-size: 12px !important;
-}
-
-.debug-model-input {
-  flex: 1;
-  min-width: 160px;
-  padding: 4px 8px !important;
-  font-size: 12px !important;
-}
-
-.debug-panel-response {
-  margin-top: 10px;
 }
 </style>

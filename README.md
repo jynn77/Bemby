@@ -10,7 +10,17 @@
 
 一款自托管的自动化工具，用于管理每日 Telegram 机器人签到和 Emby 视频观看会话。内置 Web 管理门户，支持多账号和多任务管理。
 
-![Bemby 管理面板](docs/screenshot.png)
+<table>
+  <tr>
+    <td align="center" colspan="3"><img src="docs/screenshot.png" alt="管理面板" /><br/><sub>任务配置</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/rich_content_logs.png" alt="丰富内容日志" /><br/><sub>丰富内容日志</sub></td>
+    <td align="center"><img src="docs/ai_debugging_console.png" alt="AI 调试" /><br/><sub>AI 调试</sub></td>
+    <td align="center"><img src="docs/ai_provider_config.png" alt="AI 设置" /><br/><sub>AI 设置</sub></td>
+  </tr>
+</table>
+
 
 ---
 
