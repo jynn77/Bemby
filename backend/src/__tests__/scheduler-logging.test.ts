@@ -77,7 +77,7 @@ describe("executeJob — DB status logging", () => {
   // that never fires during the test.
   // Helper: find a SQL string that was passed to prepare()
   function preparedSqls() {
-    return mockPrepare.mock.calls.map(([sql]: [string]) => sql);
+    return mockPrepare.mock.calls.map(([sql]: any[]) => sql);
   }
 
   beforeEach(() => {
