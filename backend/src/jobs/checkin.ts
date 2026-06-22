@@ -475,8 +475,11 @@ export function waitForBotMessageEdit(
       const isEdit =
         update.className === 'UpdateEditMessage' ||
         update.className === 'UpdateEditChannelMessage';
-      if (isEdit && (update.message as Api.Message)?.id === originalMsgId) {
-        finish(update.message as Api.Message);
+      if (isEdit) {
+        const msg = update.message as Api.Message;
+        // Catch any inbound edit from the bot (not our own outgoing messages).
+        // Some bots edit a different message than the one that had the buttons.
+        if (msg && !msg.out) finish(msg);
       }
     };
 
@@ -615,18 +618,18 @@ export async function runCheckin(
         const btnText = (btn as any).text as string;
         const matches = useExactMatch ? btnText === targetText : btnText.includes(targetText);
         if (matches) {
-          // Start watching BEFORE invoking to avoid a race condition.
-          // Bots respond either by editing the original message or sending a new one.
-          // Use replyTimeoutMs so slow bots (>10s) still get captured.
-          const editPromise = waitForBotMessageEdit(client, buttonsMsg.id, replyTimeoutMs, signal);
-          const newMsgPromise = waitForNewBotMessage(client, botUsername, replyTimeoutMs, signal);
-
           if (!(btn instanceof Api.KeyboardButtonCallback)) {
             const typeName = (btn as any).className ?? btn.constructor?.name ?? 'unknown';
             throw new Error(
               `Button "${btnText}" is a ${typeName}, not a callback button — only KeyboardButtonCallback can be clicked automatically`,
             );
           }
+
+          // Start watching BEFORE invoking to avoid missing a fast response.
+          // Edit listener catches any inbound bot edit (not just the buttons message).
+          const editPromise = waitForBotMessageEdit(client, buttonsMsg.id, replyTimeoutMs, signal);
+          const newMsgPromise = waitForNewBotMessage(client, botUsername, replyTimeoutMs, signal);
+
           const t_click = Date.now();
           const answer = await client.invoke(new Api.messages.GetBotCallbackAnswer({
             peer,
@@ -636,13 +639,23 @@ export async function runCheckin(
           log.buttonClickMs = Date.now() - t_click;
           log.buttonClicked = btnText;
           if (answer.message) log.callbackAnswer = answer.message;
+          console.log(`[checkin] callback answer: message="${answer.message ?? ''}" url="${(answer as any).url ?? ''}" alert=${(answer as any).alert ?? false}`);
           clicked = true;
+
+          // If the bot already confirmed via toast (answer.message), allow a short
+          // grace window for any follow-up edit/message; otherwise wait longer.
+          const capMs = answer.message
+            ? Math.min(replyTimeoutMs, 5_000)
+            : Math.min(replyTimeoutMs, 30_000);
+          const capPromise = new Promise<{ msg: null; src: 'cap' }>(r =>
+            setTimeout(() => r({ msg: null, src: 'cap' }), capMs),
+          );
 
           // Take whichever response arrives first; track the source for dev logs
           const t_resp = Date.now();
           const taggedEdit = editPromise.then(m => ({ msg: m, src: 'edit' as const }));
           const taggedNew = newMsgPromise.then(m => ({ msg: m, src: 'new_message' as const }));
-          const { msg: responseMsg, src: respSrc } = await Promise.race([taggedEdit, taggedNew]);
+          const { msg: responseMsg, src: respSrc } = await Promise.race([taggedEdit, taggedNew, capPromise]);
           log.buttonResponseMs = Date.now() - t_resp;
           if (responseMsg && !signal?.aborted) {
             log.buttonResponseSource = respSrc;
