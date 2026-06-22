@@ -1,5 +1,5 @@
 # ── Stage 1: Build frontend ────────────────────────────────────────────────────
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ── Stage 2: Build backend + compile native addons + prune to prod deps ────────
-FROM node:20-alpine AS backend-builder
+FROM node:22-alpine AS backend-builder
 WORKDIR /app
 # python3/make/g++ required to compile better-sqlite3 native addon
 RUN apk add --no-cache python3 make g++
@@ -17,7 +17,7 @@ COPY backend/ ./
 RUN npm run build && npm prune --omit=dev
 
 # ── Stage 3: Production image ──────────────────────────────────────────────────
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 WORKDIR /app
 
 COPY --from=backend-builder /app/node_modules ./node_modules
