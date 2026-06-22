@@ -119,6 +119,7 @@ export type JobTemplate = {
   timezone: string;
   replyTimeoutMs: number;
   retryMax: number;
+  enabled: boolean;
   config: string | null;
   startCommand: string;
   checkinButton: string;

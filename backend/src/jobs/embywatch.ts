@@ -28,18 +28,36 @@ async function embyRequest<T = any>(
   opts: { method?: string; token?: string; ua: string; deviceName: string; body?: unknown }
 ): Promise<T> {
   const url = `${baseUrl.replace(/\/$/, '')}${path}`;
-  const res = await fetch(url, {
-    method: opts.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': opts.ua,
-      'X-Emby-Authorization': buildAuthHeader(opts.deviceName, opts.token),
-    },
-    body: opts.body != null ? JSON.stringify(opts.body) : undefined,
-  });
+  const method = opts.method ?? 'GET';
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': opts.ua,
+        'X-Emby-Authorization': buildAuthHeader(opts.deviceName, opts.token),
+      },
+      body: opts.body != null ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch (err: any) {
+    // Network-level failure (ECONNREFUSED, ENOTFOUND, timeout, etc.)
+    const cause = err?.cause?.message ?? err?.cause?.code ?? '';
+    throw new Error(`Cannot reach Emby server at ${url}${cause ? ` — ${cause}` : ''}`);
+  }
 
   const text = await res.text();
-  if (!res.ok) throw new Error(`Emby ${opts.method ?? 'GET'} ${path} → ${res.status}: ${text}`);
+  if (!res.ok) {
+    // Try to extract a human-readable message from Emby's JSON error body
+    let detail = text;
+    try {
+      const json = JSON.parse(text) as Record<string, unknown>;
+      if (typeof json.Message === 'string' && json.Message) detail = json.Message;
+      else if (typeof json.message === 'string' && json.message) detail = json.message;
+    } catch { /* leave detail as raw text */ }
+    throw new Error(`Emby ${method} ${path} → ${res.status} ${res.statusText}: ${detail}`);
+  }
   return text ? JSON.parse(text) : (null as T);
 }
 

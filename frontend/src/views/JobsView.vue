@@ -35,10 +35,19 @@
           <option v-for="opt in botUrlTplOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
       </div>
+      <!-- Bulk action bar -->
+      <div v-if="selectedJobIds.length" class="bulk-bar">
+        <span class="bulk-count">{{ t('jobs.selectedCount').replace('{n}', String(selectedJobIds.length)) }}</span>
+        <button class="btn btn-sm btn-ghost" @click="bulkEnableJobs"><i class="fa-solid fa-circle-check"></i> {{ t('jobs.bulkEnable').replace('{n}', String(selectedJobIds.length)) }}</button>
+        <button class="btn btn-sm btn-ghost" @click="confirmBulkDisableJobs = true"><i class="fa-solid fa-ban"></i> {{ t('jobs.bulkDisable').replace('{n}', String(selectedJobIds.length)) }}</button>
+        <button class="btn btn-sm btn-danger" @click="confirmBulkDeleteJobs = true"><i class="fa-solid fa-trash"></i> {{ t('jobs.bulkDelete').replace('{n}', String(selectedJobIds.length)) }}</button>
+        <button class="btn btn-sm btn-ghost" style="margin-left:auto" @click="selectedJobIds = []"><i class="fa-solid fa-xmark"></i></button>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
+              <th style="width:36px"><input type="checkbox" :checked="allJobsSelected" :indeterminate="selectedJobIds.length > 0 && !allJobsSelected" @change="toggleAllJobs" /></th>
               <th class="th-sort" :class="sortKey === 'name' ? 'sort-active' : ''" @click="setSort('name')">{{ t('common.name') }} <span class="sort-icon">{{ sortIcon('name') }}</span></th>
               <th class="th-sort" :class="sortKey === 'account' ? 'sort-active' : ''" @click="setSort('account')">{{ t('jobs.colAccount') }} <span class="sort-icon">{{ sortIcon('account') }}</span></th>
               <th class="th-sort" :class="sortKey === 'type' ? 'sort-active' : ''" @click="setSort('type')">{{ t('jobs.colType') }} <span class="sort-icon">{{ sortIcon('type') }}</span></th>
@@ -50,7 +59,7 @@
           </thead>
           <tbody>
             <tr v-if="!sortedJobs.length">
-              <td colspan="7" class="empty">{{ t('jobs.noJobs') }}</td>
+              <td colspan="8" class="empty">{{ t('jobs.noJobs') }}</td>
             </tr>
             <tr
               v-for="j in sortedJobs" :key="j.id"
@@ -58,6 +67,7 @@
               :class="selectedJobId === j.id ? 'row-selected' : ''"
               @click="selectedJobId = selectedJobId === j.id ? null : j.id"
             >
+              <td @click.stop><input type="checkbox" :checked="selectedJobIds.includes(j.id)" @change="toggleJobSelect(j.id)" /></td>
               <td>{{ j.name }}</td>
               <td>{{ j.accountName ?? j.accountId }}</td>
               <td><span :class="jobTypeBadge(j.jobType)">{{ t(`logs.jobType.${j.jobType}`) }}</span></td>
@@ -111,7 +121,7 @@
             <label class="form-label">{{ t('templates.labelTemplate') }}</label>
             <select v-model="form.templateId" class="form-select" @change="onTemplateChange">
               <option :value="null">{{ t('templates.noTemplate') }}</option>
-              <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
+              <option v-for="tpl in templates.filter(t => t.enabled || t.id === form.templateId)" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
             </select>
           </div>
           <div style="padding-bottom:9px;white-space:nowrap">
@@ -520,6 +530,34 @@
       </div>
     </div>
 
+    <!-- Bulk disable confirmation -->
+    <div v-if="confirmBulkDisableJobs" class="modal-backdrop">
+      <div class="modal" style="width:380px">
+        <h3 class="modal-title">{{ t('common.disable') }}</h3>
+        <div class="modal-body">
+          <p>{{ t('jobs.confirmBulkDisable').replace('{n}', String(selectedJobIds.length)) }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="confirmBulkDisableJobs = false"><i class="fa-solid fa-xmark"></i> {{ t('common.cancel') }}</button>
+          <button class="btn btn-danger" @click="executeBulkDisableJobs"><i class="fa-solid fa-ban"></i> {{ t('common.disable') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk delete confirmation -->
+    <div v-if="confirmBulkDeleteJobs" class="modal-backdrop">
+      <div class="modal" style="width:380px">
+        <h3 class="modal-title">{{ t('common.delete') }}</h3>
+        <div class="modal-body">
+          <p>{{ t('jobs.confirmBulkDelete').replace('{n}', String(selectedJobIds.length)) }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="confirmBulkDeleteJobs = false"><i class="fa-solid fa-xmark"></i> {{ t('common.cancel') }}</button>
+          <button class="btn btn-danger" @click="executeBulkDeleteJobs"><i class="fa-solid fa-trash"></i> {{ t('common.delete') }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Mobile action sheet -->
     <div v-if="actionMenuJob" class="action-sheet-backdrop" @click="actionMenuJob = null">
       <div class="action-sheet" @click.stop>
@@ -606,6 +644,10 @@ const sortDir = usePersistedRef<'asc' | 'desc'>('bemby:jobs:sortDir', 'asc');
 const selectedJobId = ref<number | null>(null);
 const actionMenuJob = ref<Job | null>(null);
 const confirmDisableJob = ref<Job | null>(null);
+const selectedJobIds = ref<number[]>([]);
+const allJobsSelected = computed(() => sortedJobs.value.length > 0 && sortedJobs.value.every(j => selectedJobIds.value.includes(j.id)));
+const confirmBulkDisableJobs = ref(false);
+const confirmBulkDeleteJobs = ref(false);
 
 function setSort(key: string) {
   if (sortKey.value === key) {
@@ -1163,7 +1205,38 @@ async function executeDisable() {
 async function remove(id: number) {
   if (!confirm(t('jobs.confirmDelete'))) return;
   await jobsApi.delete(id);
+  selectedJobIds.value = selectedJobIds.value.filter(i => i !== id);
   await loadJobs();
+}
+
+function toggleAllJobs() {
+  selectedJobIds.value = allJobsSelected.value ? [] : sortedJobs.value.map(j => j.id);
+}
+
+function toggleJobSelect(id: number) {
+  const idx = selectedJobIds.value.indexOf(id);
+  if (idx === -1) selectedJobIds.value.push(id);
+  else selectedJobIds.value.splice(idx, 1);
+}
+
+async function bulkEnableJobs() {
+  await Promise.all(selectedJobIds.value.map(id => jobsApi.update(id, { enabled: true })));
+  await Promise.all([loadJobs(), loadStatus()]);
+  selectedJobIds.value = [];
+}
+
+async function executeBulkDisableJobs() {
+  await Promise.all(selectedJobIds.value.map(id => jobsApi.update(id, { enabled: false })));
+  await Promise.all([loadJobs(), loadStatus()]);
+  confirmBulkDisableJobs.value = false;
+  selectedJobIds.value = [];
+}
+
+async function executeBulkDeleteJobs() {
+  await Promise.all(selectedJobIds.value.map(id => jobsApi.delete(id)));
+  await loadJobs();
+  confirmBulkDeleteJobs.value = false;
+  selectedJobIds.value = [];
 }
 
 function stopRunning(jobId: number) {
@@ -1365,5 +1438,20 @@ onUnmounted(() => {
 .action-sheet-cancel {
   color: #888;
   font-weight: 500;
+}
+
+.bulk-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 16px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.bulk-count {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
 }
 </style>

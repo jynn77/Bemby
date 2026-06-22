@@ -2,11 +2,16 @@
   <div>
     <div class="page-header">
       <h2 class="page-title">{{ t('templates.title') }}</h2>
-      <div style="display:flex;gap:8px">
-        <button v-if="selectedIds.length" class="btn btn-secondary" @click="shareSelected">
-          <i :class="sharedMulti ? 'fa-solid fa-check' : 'fa-solid fa-share-nodes'"></i>
-          {{ t('templates.shareSelectedBtn').replace('{n}', String(selectedIds.length)) }}
-        </button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <template v-if="selectedIds.length">
+          <button class="btn btn-secondary" @click="shareSelected">
+            <i :class="sharedMulti ? 'fa-solid fa-check' : 'fa-solid fa-share-nodes'"></i>
+            {{ t('templates.shareSelectedBtn').replace('{n}', String(selectedIds.length)) }}
+          </button>
+          <button class="btn btn-ghost" @click="bulkEnableTpls"><i class="fa-solid fa-circle-check"></i> {{ t('templates.bulkEnable').replace('{n}', String(selectedIds.length)) }}</button>
+          <button class="btn btn-ghost" @click="confirmBulkDisableTpls = true"><i class="fa-solid fa-ban"></i> {{ t('templates.bulkDisable').replace('{n}', String(selectedIds.length)) }}</button>
+          <button class="btn btn-danger" @click="confirmBulkDeleteTpls = true"><i class="fa-solid fa-trash"></i> {{ t('templates.bulkDelete').replace('{n}', String(selectedIds.length)) }}</button>
+        </template>
         <button class="btn btn-secondary" @click="openImport"><i class="fa-solid fa-file-import"></i> {{ t('templates.importBtn') }}</button>
         <button class="btn btn-primary" @click="openAdd"><i class="fa-solid fa-plus"></i> {{ t('templates.addBtn') }}</button>
       </div>
@@ -22,6 +27,7 @@
               </th>
               <th>{{ t('common.name') }}</th>
               <th>{{ t('templates.colType') }}</th>
+              <th>{{ t('templates.colEnabled') }}</th>
               <th class="col-hide-mobile">{{ t('templates.colBotUrl') }}</th>
               <th class="col-hide-mobile">{{ t('templates.colLinkedJobs') }}</th>
               <th>{{ t('common.actions') }}</th>
@@ -29,12 +35,21 @@
           </thead>
           <tbody>
             <tr v-if="!templates.length">
-              <td colspan="6" class="empty">{{ t('templates.noTemplates') }}</td>
+              <td colspan="7" class="empty">{{ t('templates.noTemplates') }}</td>
             </tr>
             <tr v-for="tpl in templates" :key="tpl.id">
               <td><input type="checkbox" :checked="selectedIds.includes(tpl.id)" @change="toggleSelect(tpl.id)" /></td>
               <td>{{ tpl.name }}</td>
               <td><span :class="jobTypeBadge(tpl.jobType)">{{ t(`logs.jobType.${tpl.jobType}`) }}</span></td>
+              <td>
+                <span
+                  :class="tpl.enabled ? 'badge badge-green' : 'badge badge-grey'"
+                  style="cursor:pointer;user-select:none"
+                  @click="toggleTemplateEnabled(tpl)"
+                >
+                  {{ tpl.enabled ? t('common.yes') : t('common.no') }}
+                </span>
+              </td>
               <td class="col-hide-mobile">{{ tpl.jobType === 'embywatch' ? tpl.botUsername : '@' + tpl.botUsername }}</td>
               <td class="col-hide-mobile">{{ tpl.linkedJobCount ?? 0 }}</td>
               <td>
@@ -43,7 +58,7 @@
                     <i :class="copiedTplId === tpl.id ? 'fa-solid fa-check' : 'fa-solid fa-share-nodes'"></i>
                   </button>
                   <button class="btn btn-sm btn-ghost btn-icon" :title="t('common.edit')" @click="openEdit(tpl)"><i class="fa-solid fa-pen"></i></button>
-                  <button class="btn btn-sm btn-danger btn-icon" :title="t('common.delete')" @click="remove(tpl.id)"><i class="fa-solid fa-trash"></i></button>
+                  <button class="btn btn-sm btn-danger btn-icon" :title="t('common.delete')" @click="openDeleteTpl(tpl.id)"><i class="fa-solid fa-trash"></i></button>
                 </div>
                 <button class="btn btn-sm btn-ghost btn-icon show-mobile" @click="actionMenuTpl = tpl">
                   <i class="fa-solid fa-ellipsis-vertical"></i>
@@ -364,6 +379,48 @@
       </div>
     </div>
 
+    <!-- Single delete confirmation -->
+    <div v-if="confirmDeleteTplId !== null" class="modal-backdrop">
+      <div class="modal" style="width:380px">
+        <h3 class="modal-title">{{ t('common.delete') }}</h3>
+        <div class="modal-body">
+          <p>{{ t('templates.confirmDelete') }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="confirmDeleteTplId = null"><i class="fa-solid fa-xmark"></i> {{ t('common.cancel') }}</button>
+          <button class="btn btn-danger" @click="executeDeleteTpl"><i class="fa-solid fa-trash"></i> {{ t('common.delete') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk disable confirmation -->
+    <div v-if="confirmBulkDisableTpls" class="modal-backdrop">
+      <div class="modal" style="width:380px">
+        <h3 class="modal-title">{{ t('common.disable') }}</h3>
+        <div class="modal-body">
+          <p>{{ t('templates.confirmBulkDisable').replace('{n}', String(selectedIds.length)) }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="confirmBulkDisableTpls = false"><i class="fa-solid fa-xmark"></i> {{ t('common.cancel') }}</button>
+          <button class="btn btn-danger" @click="executeBulkDisableTpls"><i class="fa-solid fa-ban"></i> {{ t('common.disable') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk delete confirmation -->
+    <div v-if="confirmBulkDeleteTpls" class="modal-backdrop">
+      <div class="modal" style="width:380px">
+        <h3 class="modal-title">{{ t('common.delete') }}</h3>
+        <div class="modal-body">
+          <p>{{ t('templates.confirmBulkDelete').replace('{n}', String(selectedIds.length)) }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="confirmBulkDeleteTpls = false"><i class="fa-solid fa-xmark"></i> {{ t('common.cancel') }}</button>
+          <button class="btn btn-danger" @click="executeBulkDeleteTpls"><i class="fa-solid fa-trash"></i> {{ t('common.delete') }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Mobile action sheet -->
     <div v-if="actionMenuTpl" class="action-sheet-backdrop" @click="actionMenuTpl = null">
       <div class="action-sheet" @click.stop>
@@ -374,7 +431,7 @@
         <button class="action-sheet-btn" @click="openEdit(actionMenuTpl!); actionMenuTpl = null">
           <i class="fa-solid fa-pen"></i> {{ t('common.edit') }}
         </button>
-        <button class="action-sheet-btn danger" @click="remove(actionMenuTpl!.id); actionMenuTpl = null">
+        <button class="action-sheet-btn danger" @click="openDeleteTpl(actionMenuTpl!.id); actionMenuTpl = null">
           <i class="fa-solid fa-trash"></i> {{ t('common.delete') }}
         </button>
         <div class="action-sheet-divider"></div>
@@ -431,6 +488,9 @@ const copiedTplId = ref<number | null>(null);
 const selectedIds = ref<number[]>([]);
 const sharedMulti = ref(false);
 const allSelected = computed(() => templates.value.length > 0 && selectedIds.value.length === templates.value.length);
+const confirmDeleteTplId = ref<number | null>(null);
+const confirmBulkDisableTpls = ref(false);
+const confirmBulkDeleteTpls = ref(false);
 
 function toggleAll() {
   selectedIds.value = allSelected.value ? [] : templates.value.map(t => t.id);
@@ -776,10 +836,42 @@ async function saveTemplate() {
   }
 }
 
-async function remove(id: number) {
-  if (!confirm(t('templates.confirmDelete'))) return;
+function openDeleteTpl(id: number) {
+  confirmDeleteTplId.value = id;
+}
+
+async function executeDeleteTpl() {
+  const id = confirmDeleteTplId.value;
+  if (!id) return;
   await templatesApi.delete(id);
+  confirmDeleteTplId.value = null;
+  selectedIds.value = selectedIds.value.filter(i => i !== id);
   await loadTemplates();
+}
+
+async function toggleTemplateEnabled(tpl: JobTemplate) {
+  await templatesApi.update(tpl.id, { enabled: !tpl.enabled });
+  await loadTemplates();
+}
+
+async function bulkEnableTpls() {
+  await Promise.all(selectedIds.value.map(id => templatesApi.update(id, { enabled: true })));
+  await loadTemplates();
+  selectedIds.value = [];
+}
+
+async function executeBulkDisableTpls() {
+  await Promise.all(selectedIds.value.map(id => templatesApi.update(id, { enabled: false })));
+  await loadTemplates();
+  confirmBulkDisableTpls.value = false;
+  selectedIds.value = [];
+}
+
+async function executeBulkDeleteTpls() {
+  await Promise.all(selectedIds.value.map(id => templatesApi.delete(id)));
+  await loadTemplates();
+  confirmBulkDeleteTpls.value = false;
+  selectedIds.value = [];
 }
 
 const SHARE_KEYS: (keyof JobTemplate)[] = ['name', 'jobType', 'botUsername', 'timezone', 'replyTimeoutMs', 'retryMax', 'config', 'startCommand', 'checkinButton'];

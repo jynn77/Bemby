@@ -29,6 +29,7 @@ function rowToTemplate(row: TemplateRow): JobTemplate {
     timezone: row.timezone,
     replyTimeoutMs: row.reply_timeout_ms,
     retryMax: row.retry_max,
+    enabled: Boolean(row.enabled),
     config: row.config ?? null,
     startCommand: row.start_command || '/start',
     checkinButton: row.checkin_button || '签到',
@@ -126,6 +127,7 @@ router.put('/:id', (req, res) => {
     timezone,
     replyTimeoutMs,
     retryMax,
+    enabled,
     config,
     startCommand,
     checkinButton,
@@ -139,6 +141,7 @@ router.put('/:id', (req, res) => {
     timezone: timezone ?? existing.timezone,
     reply_timeout_ms: Number(replyTimeoutMs ?? existing.reply_timeout_ms),
     retry_max: Number(retryMax ?? existing.retry_max),
+    enabled: enabled !== undefined ? (enabled ? 1 : 0) : existing.enabled,
     config: config !== undefined
       ? (config != null ? JSON.stringify(config) : null)
       : existing.config,
@@ -153,7 +156,7 @@ router.put('/:id', (req, res) => {
   db.prepare(`
     UPDATE job_templates SET
       name = ?, job_type = ?, bot_username = ?, timezone = ?,
-      reply_timeout_ms = ?, retry_max = ?,
+      reply_timeout_ms = ?, retry_max = ?, enabled = ?,
       config = ?, start_command = ?, checkin_button = ?
     WHERE id = ?
   `).run(
@@ -163,6 +166,7 @@ router.put('/:id', (req, res) => {
     updated.timezone,
     updated.reply_timeout_ms,
     updated.retry_max,
+    updated.enabled,
     updated.config,
     updated.start_command,
     updated.checkin_button,
