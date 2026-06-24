@@ -18,6 +18,7 @@ const { mockConnect, mockSendCode, mockDisconnect, MockTelegramClient } = vi.hoi
 vi.mock('telegram', () => ({
   TelegramClient: MockTelegramClient,
   Api: {},
+  Logger: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock('telegram/sessions', () => ({

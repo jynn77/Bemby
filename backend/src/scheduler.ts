@@ -42,16 +42,17 @@ function hasRunToday(jobId: number, tz: string): boolean {
   });
 }
 
-function loadEligibleJobs(): Array<{ job: Job; account: TgAccount | null }> {
+export function loadEligibleJobs(): Array<{ job: Job; account: TgAccount | null }> {
   const rows = db
     .prepare(
       `
     SELECT j.*,
            a.api_id, a.api_hash, a.session_string, a.auth_status, a.proxy_id AS account_proxy_id,
-           a.name AS account_name, a.phone_number, a.created_at AS account_created_at
+           a.name AS account_name, a.phone_number, a.created_at AS account_created_at, a.disabled AS account_disabled
     FROM jobs j
     LEFT JOIN tg_accounts a ON j.account_id = a.id
     WHERE j.enabled = 1
+      AND (j.account_id IS NULL OR a.disabled = 0 OR a.disabled IS NULL)
       AND (
         (j.job_type != 'checkin' AND j.job_type != 'custom')
         OR (a.auth_status = 'authenticated' AND a.session_string IS NOT NULL)
@@ -89,6 +90,7 @@ function loadEligibleJobs(): Array<{ job: Job; account: TgAccount | null }> {
             sessionString: row.session_string,
             authStatus: row.auth_status,
             proxyId: row.account_proxy_id ?? null,
+            disabled: Boolean(row.account_disabled),
             createdAt: row.account_created_at,
           } as TgAccount)
         : null,

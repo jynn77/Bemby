@@ -3,6 +3,17 @@ import { LogLevel } from 'telegram/extensions/Logger';
 import { StringSession } from 'telegram/sessions';
 import type { TgProxy } from '../types';
 
+export type TgAccountStatus = {
+  isActive: boolean;
+  isDeleted: boolean;
+  isRestricted: boolean;
+  restrictions: Array<{ platform: string; reason: string; text: string }>;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  phone?: string;
+};
+
 type PendingAuth = {
   client: TelegramClient;
   phoneNumber: string;
@@ -56,6 +67,42 @@ export async function submitCode(
       return { needsPassword: true };
     }
     throw err;
+  }
+}
+
+export async function checkAccountStatus(
+  apiId: number,
+  apiHash: string,
+  sessionString: string,
+  proxy?: TgProxy,
+): Promise<TgAccountStatus> {
+  const client = new TelegramClient(
+    new StringSession(sessionString),
+    apiId,
+    apiHash,
+    { connectionRetries: 3, baseLogger: new Logger(LogLevel.NONE), ...(proxy ? { proxy } : {}) },
+  );
+
+  try {
+    await client.connect();
+    const me = await client.getMe() as Api.User;
+
+    return {
+      isActive: true,
+      isDeleted: Boolean(me.deleted),
+      isRestricted: Boolean(me.restricted),
+      restrictions: (me.restrictionReason ?? []).map(r => ({
+        platform: r.platform,
+        reason: r.reason,
+        text: r.text,
+      })),
+      firstName: me.firstName ?? '',
+      lastName: me.lastName,
+      username: me.username,
+      phone: me.phone,
+    };
+  } finally {
+    await client.disconnect().catch(() => undefined);
   }
 }
 

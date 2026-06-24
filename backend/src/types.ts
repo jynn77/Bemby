@@ -11,6 +11,7 @@ export type TgAccount = {
   sessionString: string | null;
   authStatus: AuthStatus;
   proxyId: string | null;
+  disabled: boolean;
   createdAt: string;
 };
 

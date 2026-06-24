@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/database';
-import { requestCode, submitCode, submitPassword } from '../auth/tgAuth';
+import { requestCode, submitCode, submitPassword, checkAccountStatus } from '../auth/tgAuth';
 import type { AuthStatus } from '../types';
 import { parseTgProxy } from '../jobs/runner';
 
@@ -15,6 +15,7 @@ type AccountRow = {
   session_string: string | null;
   auth_status: AuthStatus;
   proxy_id: string | null;
+  disabled: number;
   created_at: string;
 };
 
@@ -37,6 +38,7 @@ function toJson(row: AccountRow) {
     // apiHash intentionally omitted from responses
     authStatus: row.auth_status,
     proxyId: row.proxy_id ?? null,
+    disabled: Boolean(row.disabled),
     createdAt: row.created_at,
   };
 }
@@ -62,21 +64,23 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const { name, phoneNumber, apiId, apiHash, proxyId } = req.body as Record<string, string | null>;
+  const { name, phoneNumber, apiId, apiHash, proxyId, disabled } = req.body as Record<string, string | null | boolean>;
   const existing = db.prepare('SELECT * FROM tg_accounts WHERE id = ?').get(req.params.id) as AccountRow | undefined;
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
 
   // proxyId: undefined = not in payload (keep existing), null/'' = clear proxy
   const newProxyId = proxyId !== undefined ? (proxyId || null) : existing.proxy_id;
+  const newDisabled = disabled !== undefined ? (disabled ? 1 : 0) : existing.disabled;
 
   db.prepare(
-    'UPDATE tg_accounts SET name = ?, phone_number = ?, api_id = ?, api_hash = ?, proxy_id = ? WHERE id = ?'
+    'UPDATE tg_accounts SET name = ?, phone_number = ?, api_id = ?, api_hash = ?, proxy_id = ?, disabled = ? WHERE id = ?'
   ).run(
     name ?? existing.name,
     phoneNumber ?? existing.phone_number,
     Number(apiId ?? existing.api_id),
     apiHash ?? existing.api_hash,
     newProxyId,
+    newDisabled,
     req.params.id,
   );
 
@@ -87,6 +91,23 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   db.prepare('DELETE FROM tg_accounts WHERE id = ?').run(req.params.id);
   res.status(204).send();
+});
+
+// ── TG account status check ─────────────────────────────────────────────────
+
+router.post('/:id/check-status', async (req, res) => {
+  const account = db.prepare('SELECT * FROM tg_accounts WHERE id = ?').get(req.params.id) as AccountRow | undefined;
+  if (!account) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!account.session_string) { res.status(400).json({ error: 'Account not authenticated' }); return; }
+
+  try {
+    const proxyUrl = resolveProxyUrl(account.proxy_id);
+    const proxy = parseTgProxy(proxyUrl);
+    const status = await checkAccountStatus(account.api_id, account.api_hash, account.session_string, proxy);
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Telegram auth flow ──────────────────────────────────────────────────────

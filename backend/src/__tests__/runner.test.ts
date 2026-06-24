@@ -74,6 +74,7 @@ function makeAccount(): TgAccount {
     sessionString: "session",
     authStatus: "authenticated",
     proxyId: null,
+    disabled: false,
     createdAt: "2024-01-01T00:00:00Z",
   };
 }

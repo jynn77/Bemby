@@ -54,6 +54,24 @@
               <td class="col-hide-mobile">{{ tpl.linkedJobCount ?? 0 }}</td>
               <td>
                 <div class="actions hide-mobile">
+                  <button
+                    v-if="(tpl.linkedJobCount ?? 0) > 0"
+                    class="btn btn-sm btn-ghost btn-icon"
+                    :title="t('templates.createJobsBtn')"
+                    @click="openCreateJobs(tpl)"
+                  ><i class="fa-solid fa-list-check"></i></button>
+                  <button
+                    v-if="(tpl.linkedJobCount ?? 0) > 0"
+                    class="btn btn-sm btn-ghost btn-icon"
+                    :title="t('templates.enableLinkedJobs')"
+                    @click="setLinkedJobsEnabled(tpl, true)"
+                  ><i class="fa-solid fa-circle-check"></i></button>
+                  <button
+                    v-if="(tpl.linkedJobCount ?? 0) > 0"
+                    class="btn btn-sm btn-ghost btn-icon"
+                    :title="t('templates.disableLinkedJobs')"
+                    @click="setLinkedJobsEnabled(tpl, false)"
+                  ><i class="fa-solid fa-circle-xmark"></i></button>
                   <button class="btn btn-sm btn-ghost btn-icon" :title="copiedTplId === tpl.id ? t('templates.shareCopied') : t('templates.shareBtn')" @click="shareTemplate(tpl)">
                     <i :class="copiedTplId === tpl.id ? 'fa-solid fa-check' : 'fa-solid fa-share-nodes'"></i>
                   </button>
@@ -361,6 +379,91 @@
       </div>
     </div>
 
+    <!-- Create jobs from template modal -->
+    <div v-if="showCreateJobs" class="modal-backdrop">
+      <div class="modal" style="width:600px;max-height:90vh;overflow-y:auto">
+        <h3 class="modal-title">{{ t('templates.createJobsTitle') }} — {{ createJobsTpl?.name }}</h3>
+        <div class="modal-body">
+          <div v-if="createJobsError" class="error-msg">{{ createJobsError }}</div>
+
+          <!-- Schedule window -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">{{ t('templates.createJobsWindowStart') }}</label>
+              <input v-model.number="createJobsWindowStart" class="form-input" type="number" min="0" max="2359" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ t('templates.createJobsWindowEnd') }}</label>
+              <input v-model.number="createJobsWindowEnd" class="form-input" type="number" min="0" max="2359" />
+            </div>
+          </div>
+
+          <!-- Account list -->
+          <div class="form-group">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <label class="form-label" style="margin-bottom:0">{{ t('templates.createJobsAvailableAccounts') }}</label>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="btn btn-ghost btn-sm" @click="createJobsSelectAll">{{ t('templates.createJobsSelectAll') }}</button>
+                <button type="button" class="btn btn-ghost btn-sm" @click="createJobsDeselectAll">{{ t('templates.createJobsDeselectAll') }}</button>
+              </div>
+            </div>
+            <div v-if="createJobsLoading" style="text-align:center;padding:16px;color:#888">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+            </div>
+            <div v-else-if="createJobsRows.length === 0" style="padding:12px;color:#888;font-size:13px">
+              {{ t('templates.createJobsNoAccounts') }}
+            </div>
+            <div v-else class="create-jobs-list">
+              <div v-for="row in createJobsRows" :key="row.account.id" class="create-job-row">
+                <div class="create-job-header">
+                  <input
+                    type="checkbox"
+                    :checked="row.selected"
+                    :disabled="row.account.authStatus !== 'authenticated'"
+                    @change="row.selected = ($event.target as HTMLInputElement).checked"
+                  />
+                  <span class="create-job-account-name">{{ row.account.name }}</span>
+                  <span style="font-size:11px;color:#aaa">{{ row.account.phoneNumber }}</span>
+                  <span v-if="row.account.authStatus !== 'authenticated'" class="badge badge-grey" style="font-size:10px">
+                    {{ t('templates.createJobsNotAuth') }}
+                  </span>
+                </div>
+                <template v-if="row.selected">
+                  <div class="form-group" style="margin:6px 0 6px 26px">
+                    <label class="form-label" style="font-size:11px">{{ t('templates.createJobsJobName') }}</label>
+                    <input v-model.trim="row.name" class="form-input" style="font-size:12px" />
+                  </div>
+                  <template v-if="createJobsTpl?.jobType === 'embywatch'">
+                    <div class="form-row" style="margin-left:26px;margin-bottom:0">
+                      <div class="form-group" style="margin-bottom:0">
+                        <label class="form-label" style="font-size:11px">{{ t('templates.createJobsEmbyUser') }} <span style="color:#e63946">*</span></label>
+                        <input v-model.trim="row.embyUsername" class="form-input" style="font-size:12px" autocomplete="off" />
+                      </div>
+                      <div class="form-group" style="margin-bottom:0">
+                        <label class="form-label" style="font-size:11px">{{ t('templates.createJobsEmbyPass') }} <span style="color:#e63946">*</span></label>
+                        <input v-model="row.embyPassword" class="form-input" type="password" style="font-size:12px" autocomplete="new-password" />
+                      </div>
+                    </div>
+                  </template>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showCreateJobs = false"><i class="fa-solid fa-xmark"></i> {{ t('common.cancel') }}</button>
+          <button
+            class="btn btn-primary"
+            :disabled="createJobsCreating || createJobsSelectedCount === 0"
+            @click="doCreateJobs"
+          >
+            <i class="fa-solid fa-plus"></i>
+            {{ createJobsCreating ? t('templates.createJobsCreating') : t('templates.createJobsConfirm').replace('{n}', String(createJobsSelectedCount)) }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Import modal -->
     <div v-if="showImport" class="modal-backdrop">
       <div class="modal" style="width:480px">
@@ -433,6 +536,15 @@
     <div v-if="actionMenuTpl" class="action-sheet-backdrop" @click="actionMenuTpl = null">
       <div class="action-sheet" @click.stop>
         <div class="action-sheet-header">{{ actionMenuTpl.name }}</div>
+        <button class="action-sheet-btn" @click="openCreateJobs(actionMenuTpl!); actionMenuTpl = null">
+          <i class="fa-solid fa-list-check"></i> {{ t('templates.createJobsBtn') }}
+        </button>
+        <button v-if="(actionMenuTpl.linkedJobCount ?? 0) > 0" class="action-sheet-btn" @click="setLinkedJobsEnabled(actionMenuTpl!, true); actionMenuTpl = null">
+          <i class="fa-solid fa-circle-check"></i> {{ t('templates.enableLinkedJobs') }}
+        </button>
+        <button v-if="(actionMenuTpl.linkedJobCount ?? 0) > 0" class="action-sheet-btn" @click="setLinkedJobsEnabled(actionMenuTpl!, false); actionMenuTpl = null">
+          <i class="fa-solid fa-circle-xmark"></i> {{ t('templates.disableLinkedJobs') }}
+        </button>
         <button class="action-sheet-btn" @click="shareTemplate(actionMenuTpl!); actionMenuTpl = null">
           <i class="fa-solid fa-share-nodes"></i> {{ t('templates.shareBtn') }}
         </button>
@@ -453,7 +565,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { templatesApi, settingsApi, type JobTemplate, type Settings, type UAPreset, type Proxy, type EmbywatchConfig, type CustomConfig, type CustomAction } from '../api/client';
+import { templatesApi, settingsApi, type JobTemplate, type Settings, type UAPreset, type Proxy, type EmbywatchConfig, type CustomConfig, type CustomAction, type AvailableAccount } from '../api/client';
 import { t } from '../i18n';
 import { usePersistedRef } from '../composables/usePersistedRef';
 
@@ -496,6 +608,25 @@ const importJson = ref('');
 const importError = ref('');
 const importing = ref(false);
 const copiedTplId = ref<number | null>(null);
+
+// ── Create jobs from template state ──────────────────────────────────────────
+const showCreateJobs = ref(false);
+const createJobsTpl = ref<JobTemplate | null>(null);
+const createJobsAccounts = ref<AvailableAccount[]>([]);
+const createJobsLoading = ref(false);
+const createJobsError = ref('');
+const createJobsCreating = ref(false);
+const createJobsWindowStart = ref(1400);
+const createJobsWindowEnd = ref(1600);
+
+type CreateJobRow = {
+  account: AvailableAccount;
+  selected: boolean;
+  name: string;
+  embyUsername: string;
+  embyPassword: string;
+};
+const createJobsRows = ref<CreateJobRow[]>([]);
 
 const selectedIds = ref<number[]>([]);
 const sharedMulti = ref(false);
@@ -900,6 +1031,82 @@ async function saveTemplate() {
   }
 }
 
+async function setLinkedJobsEnabled(tpl: JobTemplate, enabled: boolean) {
+  await templatesApi.setLinkedJobsEnabled(tpl.id, enabled);
+}
+
+async function openCreateJobs(tpl: JobTemplate) {
+  createJobsTpl.value = tpl;
+  createJobsError.value = '';
+  createJobsLoading.value = true;
+  createJobsRows.value = [];
+  showCreateJobs.value = true;
+  try {
+    createJobsAccounts.value = await templatesApi.availableAccounts(tpl.id);
+    createJobsRows.value = createJobsAccounts.value.map(a => ({
+      account: a,
+      selected: a.authStatus === 'authenticated',
+      name: `${tpl.name} - ${a.name}`,
+      embyUsername: '',
+      embyPassword: '',
+    }));
+  } catch (err: any) {
+    createJobsError.value = err.response?.data?.error ?? 'Failed to load accounts';
+  } finally {
+    createJobsLoading.value = false;
+  }
+}
+
+const createJobsSelectedCount = computed(() => createJobsRows.value.filter(r => r.selected).length);
+
+function createJobsSelectAll() {
+  createJobsRows.value.forEach(r => { if (r.account.authStatus === 'authenticated') r.selected = true; });
+}
+
+function createJobsDeselectAll() {
+  createJobsRows.value.forEach(r => { r.selected = false; });
+}
+
+async function doCreateJobs() {
+  if (!createJobsTpl.value) return;
+  const selected = createJobsRows.value.filter(r => r.selected);
+  if (!selected.length) return;
+
+  // Validate embywatch credentials
+  if (createJobsTpl.value.jobType === 'embywatch') {
+    for (const r of selected) {
+      if (!r.embyUsername.trim() || !r.embyPassword.trim()) {
+        createJobsError.value = `${r.account.name}: Emby username and password are required`;
+        return;
+      }
+    }
+  }
+
+  createJobsError.value = '';
+  createJobsCreating.value = true;
+  try {
+    const jobs = selected.map(r => ({
+      accountId: r.account.id,
+      name: r.name.trim() || `${createJobsTpl.value!.name} - ${r.account.name}`,
+      ...(createJobsTpl.value!.jobType === 'embywatch'
+        ? { config: { username: r.embyUsername.trim(), password: r.embyPassword.trim() } }
+        : {}),
+    }));
+    const result = await templatesApi.createJobs(createJobsTpl.value.id, {
+      jobs,
+      scheduleWindowStart: Number(createJobsWindowStart.value),
+      scheduleWindowEnd: Number(createJobsWindowEnd.value),
+    });
+    showCreateJobs.value = false;
+    alert(t('templates.createJobsSuccess').replace('{n}', String(result.created)));
+    await loadTemplates();
+  } catch (err: any) {
+    createJobsError.value = err.response?.data?.error ?? t('common.saveFailed');
+  } finally {
+    createJobsCreating.value = false;
+  }
+}
+
 function openDeleteTpl(id: number) {
   confirmDeleteTplId.value = id;
 }
@@ -1134,5 +1341,32 @@ async function doImport() {
 .action-sheet-cancel {
   color: #888;
   font-weight: 500;
+}
+
+.create-jobs-list {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.create-job-row {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.create-job-row:last-child {
+  border-bottom: none;
+}
+
+.create-job-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.create-job-account-name {
+  font-weight: 500;
+  font-size: 13px;
+  flex: 1;
 }
 </style>

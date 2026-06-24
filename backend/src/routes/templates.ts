@@ -185,4 +185,98 @@ router.delete('/:id', (req, res) => {
   res.status(204).send();
 });
 
+// ── Bulk enable / disable linked jobs ────────────────────────────────────────
+
+router.put('/:id/jobs/enabled', (req, res) => {
+  const { enabled } = req.body as { enabled: boolean };
+  db.prepare('UPDATE jobs SET enabled = ? WHERE template_id = ?').run(enabled ? 1 : 0, req.params.id);
+  refreshScheduler();
+  res.json({ ok: true });
+});
+
+// ── Candidate accounts (no existing job for this template) ───────────────────
+
+router.get('/:id/available-accounts', (req, res) => {
+  const rows = db.prepare(`
+    SELECT id, name, phone_number, auth_status, disabled
+    FROM tg_accounts
+    WHERE (disabled = 0 OR disabled IS NULL)
+      AND id NOT IN (
+        SELECT account_id FROM jobs
+        WHERE template_id = ? AND account_id IS NOT NULL
+      )
+    ORDER BY name COLLATE NOCASE
+  `).all(req.params.id) as Array<{
+    id: number; name: string; phone_number: string; auth_status: string; disabled: number;
+  }>;
+
+  res.json(rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    phoneNumber: r.phone_number,
+    authStatus: r.auth_status,
+  })));
+});
+
+// ── Bulk create jobs from template ───────────────────────────────────────────
+
+type CreateJobEntry = {
+  accountId: number;
+  name: string;
+  config?: Record<string, unknown>;
+};
+
+router.post('/:id/create-jobs', (req, res) => {
+  const template = db.prepare('SELECT * FROM job_templates WHERE id = ?').get(req.params.id) as TemplateRow | undefined;
+  if (!template) { res.status(404).json({ error: 'Not found' }); return; }
+
+  const { jobs, scheduleWindowStart, scheduleWindowEnd } = req.body as {
+    jobs: CreateJobEntry[];
+    scheduleWindowStart: number;
+    scheduleWindowEnd: number;
+  };
+
+  if (!Array.isArray(jobs) || !jobs.length) {
+    res.status(400).json({ error: 'jobs array is required' }); return;
+  }
+
+  const createdIds: number[] = [];
+
+  for (const j of jobs) {
+    // For embywatch, merge per-job credentials into template config
+    let jobConfig = template.config;
+    if (j.config && template.job_type === 'embywatch') {
+      const tplCfg = template.config ? JSON.parse(template.config) : {};
+      jobConfig = JSON.stringify({ ...tplCfg, ...j.config });
+    }
+
+    const result = db.prepare(`
+      INSERT INTO jobs (
+        name, account_id, job_type, bot_username,
+        schedule_window_start, schedule_window_end, timezone,
+        reply_timeout_ms, retry_max, enabled, config,
+        start_command, checkin_button, template_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+    `).run(
+      j.name,
+      j.accountId,
+      template.job_type,
+      template.bot_username,
+      Number(scheduleWindowStart),
+      Number(scheduleWindowEnd),
+      template.timezone,
+      template.reply_timeout_ms,
+      template.retry_max,
+      jobConfig,
+      template.start_command,
+      template.checkin_button,
+      template.id,
+    );
+    createdIds.push(Number(result.lastInsertRowid));
+  }
+
+  refreshScheduler();
+  res.status(201).json({ created: createdIds.length, ids: createdIds });
+});
+
 export default router;

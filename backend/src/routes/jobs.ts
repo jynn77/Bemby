@@ -42,6 +42,7 @@ type AccountRow = {
   session_string: string | null;
   auth_status: string;
   proxy_id: string | null;
+  disabled: number;
   created_at: string;
 };
 
@@ -253,6 +254,7 @@ router.post("/:id/run", async (req, res) => {
       sessionString: accountRow.session_string,
       authStatus: accountRow.auth_status as TgAccount["authStatus"],
       proxyId: accountRow.proxy_id ?? null,
+      disabled: Boolean(accountRow.disabled),
       createdAt: accountRow.created_at,
     };
   } else if (job.accountId) {
@@ -270,6 +272,7 @@ router.post("/:id/run", async (req, res) => {
         sessionString: accountRow.session_string,
         authStatus: accountRow.auth_status as TgAccount["authStatus"],
         proxyId: accountRow.proxy_id ?? null,
+        disabled: Boolean(accountRow.disabled),
         createdAt: accountRow.created_at,
       };
     }

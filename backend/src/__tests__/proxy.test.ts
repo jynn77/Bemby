@@ -77,7 +77,7 @@ function makeCheckinJob(overrides: Partial<Job> = {}): Job {
 }
 
 function makeAccount(): TgAccount {
-  return { id: 1, name: 'A', phoneNumber: '+1', apiId: 1, apiHash: 'h', sessionString: 'sess', authStatus: 'authenticated', proxyId: null, createdAt: '' };
+  return { id: 1, name: 'A', phoneNumber: '+1', apiId: 1, apiHash: 'h', sessionString: 'sess', authStatus: 'authenticated', proxyId: null, disabled: false, createdAt: '' };
 }
 
 const stubLog = { attempt: 1, commandSent: '/start', hasMedia: false, commandResponseHtml: '', availableButtons: [] };

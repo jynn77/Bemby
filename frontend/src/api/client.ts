@@ -36,7 +36,19 @@ export type Account = {
   apiId: number;
   authStatus: AuthStatus;
   proxyId: string | null;
+  disabled: boolean;
   createdAt: string;
+};
+
+export type TgAccountStatus = {
+  isActive: boolean;
+  isDeleted: boolean;
+  isRestricted: boolean;
+  restrictions: Array<{ platform: string; reason: string; text: string }>;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  phone?: string;
 };
 
 export type EmbywatchConfig = {
@@ -233,7 +245,7 @@ export const authApi = {
 export const accountsApi = {
   list: () => api.get<Account[]>("/accounts").then((r) => r.data),
   create: (
-    data: Omit<Account, "id" | "authStatus" | "createdAt"> & {
+    data: Omit<Account, "id" | "authStatus" | "createdAt" | "disabled"> & {
       apiHash: string;
     },
   ) => api.post<Account>("/accounts", data).then((r) => r.data),
@@ -247,6 +259,10 @@ export const accountsApi = {
   verify: (id: number, data: { code?: string; password?: string }) =>
     api
       .post<{ step: string }>(`/accounts/${id}/auth/verify`, data)
+      .then((r) => r.data),
+  checkStatus: (id: number) =>
+    api
+      .post<TgAccountStatus>(`/accounts/${id}/check-status`)
       .then((r) => r.data),
 };
 
@@ -267,11 +283,30 @@ export const jobsApi = {
 
 // ── Templates ────────────────────────────────────────────────────────────────
 
+export type AvailableAccount = {
+  id: number;
+  name: string;
+  phoneNumber: string;
+  authStatus: AuthStatus;
+};
+
 export const templatesApi = {
   list: () => api.get<JobTemplate[]>('/templates').then((r) => r.data),
   create: (data: Partial<JobTemplate>) => api.post<JobTemplate>('/templates', data).then((r) => r.data),
   update: (id: number, data: Partial<JobTemplate>) => api.put<JobTemplate>(`/templates/${id}`, data).then((r) => r.data),
   delete: (id: number) => api.delete(`/templates/${id}`),
+  setLinkedJobsEnabled: (id: number, enabled: boolean) =>
+    api.put<{ ok: boolean }>(`/templates/${id}/jobs/enabled`, { enabled }).then((r) => r.data),
+  availableAccounts: (id: number) =>
+    api.get<AvailableAccount[]>(`/templates/${id}/available-accounts`).then((r) => r.data),
+  createJobs: (
+    id: number,
+    data: {
+      jobs: Array<{ accountId: number; name: string; config?: Record<string, unknown> }>;
+      scheduleWindowStart: number;
+      scheduleWindowEnd: number;
+    },
+  ) => api.post<{ created: number; ids: number[] }>(`/templates/${id}/create-jobs`, data).then((r) => r.data),
 };
 
 // ── Logs ─────────────────────────────────────────────────────────────────────
