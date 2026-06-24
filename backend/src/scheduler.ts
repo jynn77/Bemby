@@ -48,7 +48,8 @@ export function loadEligibleJobs(): Array<{ job: Job; account: TgAccount | null 
       `
     SELECT j.*,
            a.api_id, a.api_hash, a.session_string, a.auth_status, a.proxy_id AS account_proxy_id,
-           a.name AS account_name, a.phone_number, a.created_at AS account_created_at, a.disabled AS account_disabled
+           a.name AS account_name, a.phone_number, a.created_at AS account_created_at, a.disabled AS account_disabled,
+           a.app_client_id AS account_app_client_id
     FROM jobs j
     LEFT JOIN tg_accounts a ON j.account_id = a.id
     WHERE j.enabled = 1
@@ -91,6 +92,7 @@ export function loadEligibleJobs(): Array<{ job: Job; account: TgAccount | null 
             authStatus: row.auth_status,
             proxyId: row.account_proxy_id ?? null,
             disabled: Boolean(row.account_disabled),
+            appClientId: row.account_app_client_id ?? null,
             createdAt: row.account_created_at,
           } as TgAccount)
         : null,

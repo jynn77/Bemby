@@ -43,6 +43,7 @@ type AccountRow = {
   auth_status: string;
   proxy_id: string | null;
   disabled: number;
+  app_client_id: string | null;
   created_at: string;
 };
 
@@ -255,6 +256,7 @@ router.post("/:id/run", async (req, res) => {
       authStatus: accountRow.auth_status as TgAccount["authStatus"],
       proxyId: accountRow.proxy_id ?? null,
       disabled: Boolean(accountRow.disabled),
+      appClientId: accountRow.app_client_id ?? null,
       createdAt: accountRow.created_at,
     };
   } else if (job.accountId) {
@@ -273,6 +275,7 @@ router.post("/:id/run", async (req, res) => {
         authStatus: accountRow.auth_status as TgAccount["authStatus"],
         proxyId: accountRow.proxy_id ?? null,
         disabled: Boolean(accountRow.disabled),
+        appClientId: accountRow.app_client_id ?? null,
         createdAt: accountRow.created_at,
       };
     }

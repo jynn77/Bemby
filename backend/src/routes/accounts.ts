@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { db } from '../db/database';
 import { requestCode, submitCode, submitPassword, checkAccountStatus } from '../auth/tgAuth';
-import type { AuthStatus } from '../types';
+import type { AuthStatus, TgAppClient } from '../types';
+import type { TgDeviceParams } from '../auth/tgAuth';
 import { parseTgProxy } from '../jobs/runner';
 
 const router = Router();
@@ -16,8 +17,27 @@ type AccountRow = {
   auth_status: AuthStatus;
   proxy_id: string | null;
   disabled: number;
+  app_client_id: string | null;
   created_at: string;
 };
+
+function resolveAppClientParams(appClientId: string | null | undefined): TgDeviceParams | undefined {
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_app_clients') as { value: string } | undefined;
+    if (!row?.value) return undefined;
+    const list = JSON.parse(row.value) as TgAppClient[];
+    const client = appClientId ? list.find(c => c.id === appClientId) : list.find(c => c.isDefault);
+    if (!client) return undefined;
+    return {
+      deviceModel: client.deviceModel,
+      systemVersion: client.systemVersion,
+      appVersion: client.appVersion,
+      langCode: client.langCode,
+      langPack: client.langPack,
+      systemLangCode: client.systemLangCode,
+    };
+  } catch { return undefined; }
+}
 
 function resolveProxyUrl(proxyId: string | null | undefined): string | undefined {
   if (!proxyId) return undefined;
@@ -39,6 +59,7 @@ function toJson(row: AccountRow) {
     authStatus: row.auth_status,
     proxyId: row.proxy_id ?? null,
     disabled: Boolean(row.disabled),
+    appClientId: row.app_client_id ?? null,
     createdAt: row.created_at,
   };
 }
@@ -49,31 +70,32 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, phoneNumber, apiId, apiHash, proxyId } = req.body as Record<string, string>;
+  const { name, phoneNumber, apiId, apiHash, proxyId, appClientId } = req.body as Record<string, string>;
   if (!name || !phoneNumber || !apiId || !apiHash) {
     res.status(400).json({ error: 'name, phoneNumber, apiId, apiHash are required' });
     return;
   }
 
   const result = db.prepare(
-    'INSERT INTO tg_accounts (name, phone_number, api_id, api_hash, proxy_id) VALUES (?, ?, ?, ?, ?)'
-  ).run(name, phoneNumber, Number(apiId), apiHash, proxyId || null);
+    'INSERT INTO tg_accounts (name, phone_number, api_id, api_hash, proxy_id, app_client_id) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(name, phoneNumber, Number(apiId), apiHash, proxyId || null, appClientId || null);
 
   const row = db.prepare('SELECT * FROM tg_accounts WHERE id = ?').get(result.lastInsertRowid) as AccountRow;
   res.status(201).json(toJson(row));
 });
 
 router.put('/:id', (req, res) => {
-  const { name, phoneNumber, apiId, apiHash, proxyId, disabled } = req.body as Record<string, string | null | boolean>;
+  const { name, phoneNumber, apiId, apiHash, proxyId, disabled, appClientId } = req.body as Record<string, string | null | boolean>;
   const existing = db.prepare('SELECT * FROM tg_accounts WHERE id = ?').get(req.params.id) as AccountRow | undefined;
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
 
-  // proxyId: undefined = not in payload (keep existing), null/'' = clear proxy
+  // undefined = not in payload (keep existing), null/'' = clear
   const newProxyId = proxyId !== undefined ? (proxyId || null) : existing.proxy_id;
   const newDisabled = disabled !== undefined ? (disabled ? 1 : 0) : existing.disabled;
+  const newAppClientId = appClientId !== undefined ? (appClientId || null) : existing.app_client_id;
 
   db.prepare(
-    'UPDATE tg_accounts SET name = ?, phone_number = ?, api_id = ?, api_hash = ?, proxy_id = ?, disabled = ? WHERE id = ?'
+    'UPDATE tg_accounts SET name = ?, phone_number = ?, api_id = ?, api_hash = ?, proxy_id = ?, disabled = ?, app_client_id = ? WHERE id = ?'
   ).run(
     name ?? existing.name,
     phoneNumber ?? existing.phone_number,
@@ -81,6 +103,7 @@ router.put('/:id', (req, res) => {
     apiHash ?? existing.api_hash,
     newProxyId,
     newDisabled,
+    newAppClientId,
     req.params.id,
   );
 
@@ -103,7 +126,8 @@ router.post('/:id/check-status', async (req, res) => {
   try {
     const proxyUrl = resolveProxyUrl(account.proxy_id);
     const proxy = parseTgProxy(proxyUrl);
-    const status = await checkAccountStatus(account.api_id, account.api_hash, account.session_string, proxy);
+    const deviceParams = resolveAppClientParams(account.app_client_id);
+    const status = await checkAccountStatus(account.api_id, account.api_hash, account.session_string, proxy, deviceParams);
     res.json(status);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -119,7 +143,8 @@ router.post('/:id/auth/request', async (req, res) => {
   try {
     const proxyUrl = resolveProxyUrl(account.proxy_id);
     const proxy = parseTgProxy(proxyUrl);
-    await requestCode(account.id, account.api_id, account.api_hash, account.phone_number, proxy);
+    const deviceParams = resolveAppClientParams(account.app_client_id);
+    await requestCode(account.id, account.api_id, account.api_hash, account.phone_number, proxy, deviceParams);
     db.prepare("UPDATE tg_accounts SET auth_status = 'pending_code' WHERE id = ?").run(account.id);
     res.json({ message: 'Verification code sent' });
   } catch (err: any) {

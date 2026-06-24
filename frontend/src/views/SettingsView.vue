@@ -317,6 +317,73 @@
         </div>
       </div>
 
+      <!-- TG App Clients -->
+      <div class="card s-col-6">
+        <div class="card-body">
+          <div class="card-section-title">{{ t("settings.appClientsSection") }}</div>
+          <p style="font-size:12px;color:#888;margin:0 0 12px">{{ t("settings.appClientsHint") }}</p>
+
+          <div v-if="appClientsMsg" class="success-msg">{{ appClientsMsg }}</div>
+          <div v-if="appClientsError" class="error-msg">{{ appClientsError }}</div>
+
+          <div v-for="(c, i) in appClients" :key="c.id">
+            <div v-if="editingClientId === c.id" class="proxy-edit-panel">
+              <div class="proxy-row">
+                <input v-model.trim="editClientForm.name" class="form-input" style="flex:0 0 110px" :placeholder="t('settings.appClientName')" />
+                <input v-model.trim="editClientForm.deviceModel" class="form-input" style="flex:1" :placeholder="t('settings.appClientDevice')" />
+              </div>
+              <div class="proxy-row">
+                <input v-model.trim="editClientForm.systemVersion" class="form-input" style="flex:1" :placeholder="t('settings.appClientSystem')" />
+                <input v-model.trim="editClientForm.appVersion" class="form-input" style="flex:0 0 120px" :placeholder="t('settings.appClientApp')" />
+              </div>
+              <div class="proxy-row">
+                <input v-model.trim="editClientForm.langCode" class="form-input" style="flex:0 0 80px" :placeholder="t('settings.appClientLangCode')" />
+                <input v-model.trim="editClientForm.langPack" class="form-input" style="flex:1" :placeholder="t('settings.appClientLangPack')" />
+                <input v-model.trim="editClientForm.systemLangCode" class="form-input" style="flex:0 0 100px" :placeholder="t('settings.appClientSysLang')" />
+              </div>
+              <div class="proxy-row">
+                <button class="btn btn-sm btn-primary" :disabled="!editClientForm.name || !editClientForm.deviceModel" @click="saveClientEdit(i)">{{ t('common.save') }}</button>
+                <button class="btn btn-sm btn-ghost" @click="editingClientId = null">{{ t('common.cancel') }}</button>
+              </div>
+            </div>
+            <div v-else class="ua-preset-row">
+              <span class="ua-preset-name">{{ c.name }}</span>
+              <span class="ua-preset-value">{{ c.deviceModel }} / {{ c.systemVersion }}</span>
+              <span v-if="c.isDefault" class="badge badge-green" style="font-size:11px;padding:1px 6px">{{ t('settings.appClientIsDefault') }}</span>
+              <button v-else class="btn btn-sm btn-ghost btn-icon" :title="t('settings.appClientSetDefault')" @click="setDefaultClient(i)"><i class="fa-regular fa-star"></i></button>
+              <button class="btn btn-sm btn-ghost btn-icon" :title="t('common.edit')" @click="startEditClient(c)"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-sm btn-ghost ua-preset-del" :title="t('settings.appClientDeleteTip')" :disabled="c.isDefault" @click="removeClient(i)"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+          </div>
+
+          <!-- Add new client form -->
+          <div class="proxy-edit-panel" style="margin-top:8px">
+            <div class="proxy-row">
+              <input v-model.trim="newClient.name" class="form-input" style="flex:0 0 110px" :placeholder="t('settings.appClientName')" />
+              <input v-model.trim="newClient.deviceModel" class="form-input" style="flex:1" :placeholder="t('settings.appClientDevice')" />
+            </div>
+            <div class="proxy-row">
+              <input v-model.trim="newClient.systemVersion" class="form-input" style="flex:1" :placeholder="t('settings.appClientSystem')" />
+              <input v-model.trim="newClient.appVersion" class="form-input" style="flex:0 0 120px" :placeholder="t('settings.appClientApp')" />
+            </div>
+            <div class="proxy-row">
+              <input v-model.trim="newClient.langCode" class="form-input" style="flex:0 0 80px" :placeholder="t('settings.appClientLangCode')" />
+              <input v-model.trim="newClient.langPack" class="form-input" style="flex:1" :placeholder="t('settings.appClientLangPack')" />
+              <input v-model.trim="newClient.systemLangCode" class="form-input" style="flex:0 0 100px" :placeholder="t('settings.appClientSysLang')" />
+            </div>
+            <div class="proxy-row">
+              <button class="btn btn-ghost btn-sm" :disabled="!newClient.name || !newClient.deviceModel" @click="addClient">
+                <i class="fa-solid fa-plus"></i> {{ t("settings.addAppClient") }}
+              </button>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" style="margin-top:14px" :disabled="appClientsSaving" @click="saveAppClients">
+            <i class="fa-solid fa-floppy-disk"></i> {{ appClientsSaving ? t("common.saving") : t("settings.saveBtn") }}
+          </button>
+        </div>
+      </div>
+
       <!-- Import / Export -->
       <div class="card s-col-6">
         <div class="card-body">
@@ -540,7 +607,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from "vue";
 import { settingsApi, authApi, dataApi, aiSuppliersApi } from "../api/client";
-import type { ExportPayload, UAPreset, AiSupplier, Proxy } from "../api/client";
+import type { ExportPayload, UAPreset, AiSupplier, Proxy, TgAppClient } from "../api/client";
 import { t } from "../i18n";
 
 const timezones = [
@@ -642,6 +709,80 @@ function onProxyHostInput(form: ProxyForm) {
   }
 }
 
+// ── TG App Clients ─────────────────────────────────────────────────────────────
+
+const appClients = ref<TgAppClient[]>([]);
+const appClientsSaving = ref(false);
+const editingClientId = ref<string | null>(null);
+const appClientsMsg = ref('');
+const appClientsError = ref('');
+
+type AppClientForm = { name: string; deviceModel: string; systemVersion: string; appVersion: string; langCode: string; langPack: string; systemLangCode: string };
+const newClient = reactive<AppClientForm>({ name: '', deviceModel: '', systemVersion: '', appVersion: '', langCode: 'en', langPack: '', systemLangCode: 'en-US' });
+const editClientForm = reactive<AppClientForm>({ name: '', deviceModel: '', systemVersion: '', appVersion: '', langCode: 'en', langPack: '', systemLangCode: 'en-US' });
+
+function addClient() {
+  if (!newClient.name.trim() || !newClient.deviceModel.trim()) return;
+  appClients.value.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+    name: newClient.name.trim(),
+    deviceModel: newClient.deviceModel.trim(),
+    systemVersion: newClient.systemVersion.trim(),
+    appVersion: newClient.appVersion.trim(),
+    langCode: newClient.langCode.trim() || 'en',
+    langPack: newClient.langPack.trim(),
+    systemLangCode: newClient.systemLangCode.trim() || 'en-US',
+    isDefault: false,
+  });
+  Object.assign(newClient, { name: '', deviceModel: '', systemVersion: '', appVersion: '', langCode: 'en', langPack: '', systemLangCode: 'en-US' });
+}
+
+function removeClient(index: number) {
+  appClients.value.splice(index, 1);
+}
+
+function startEditClient(c: TgAppClient) {
+  editingClientId.value = c.id;
+  Object.assign(editClientForm, {
+    name: c.name, deviceModel: c.deviceModel, systemVersion: c.systemVersion,
+    appVersion: c.appVersion, langCode: c.langCode, langPack: c.langPack, systemLangCode: c.systemLangCode,
+  });
+}
+
+function saveClientEdit(index: number) {
+  if (!editClientForm.name.trim() || !editClientForm.deviceModel.trim()) return;
+  const existing = appClients.value[index];
+  appClients.value[index] = {
+    ...existing,
+    name: editClientForm.name.trim(),
+    deviceModel: editClientForm.deviceModel.trim(),
+    systemVersion: editClientForm.systemVersion.trim(),
+    appVersion: editClientForm.appVersion.trim(),
+    langCode: editClientForm.langCode.trim() || 'en',
+    langPack: editClientForm.langPack.trim(),
+    systemLangCode: editClientForm.systemLangCode.trim() || 'en-US',
+  };
+  editingClientId.value = null;
+}
+
+function setDefaultClient(index: number) {
+  appClients.value = appClients.value.map((c, i) => ({ ...c, isDefault: i === index }));
+}
+
+async function saveAppClients() {
+  appClientsMsg.value = '';
+  appClientsError.value = '';
+  appClientsSaving.value = true;
+  try {
+    await settingsApi.update({ tg_app_clients: JSON.stringify(appClients.value) });
+    appClientsMsg.value = t('settings.saved');
+  } catch (err: any) {
+    appClientsError.value = err.response?.data?.error ?? t('settings.saveFailed');
+  } finally {
+    appClientsSaving.value = false;
+  }
+}
+
 const notifyEventOptions = computed(() => [
   { value: "failed", label: t("settings.notifyEventFailed") },
   { value: "success", label: t("settings.notifyEventSuccess") },
@@ -667,6 +808,7 @@ onMounted(async () => {
     form.default_ua = s.default_ua ?? "";
     try { uaPresets.value = JSON.parse(s.ua_presets ?? "[]"); } catch { uaPresets.value = []; }
     try { proxies.value = JSON.parse(s.proxies ?? "[]"); } catch { proxies.value = []; }
+    try { appClients.value = JSON.parse(s.tg_app_clients ?? "[]"); } catch { appClients.value = []; }
     form.default_play_duration = Number(s.default_play_duration ?? 300);
     form.default_device_name = s.default_device_name ?? "Mac";
     form.ai_model = s.ai_model ?? "";

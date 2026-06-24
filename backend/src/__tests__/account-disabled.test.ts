@@ -40,6 +40,7 @@ const SCHEMA = `
     auth_status    TEXT    NOT NULL DEFAULT 'unauthenticated',
     proxy_id       TEXT,
     disabled       INTEGER NOT NULL DEFAULT 0,
+    app_client_id  TEXT,
     created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -222,5 +223,27 @@ describe('loadEligibleJobs — disabled account filter', () => {
 
     expect(entry).toBeDefined();
     expect(entry!.account!.disabled).toBe(false);
+  });
+
+  it('returns account with the correct appClientId when one is set', () => {
+    const acct = insertAccount({ disabled: 0 });
+    testDb.prepare('UPDATE tg_accounts SET app_client_id = ? WHERE id = ?').run('preset-ios', acct.id);
+    insertJob({ accountId: acct.id, jobType: 'checkin' });
+
+    const eligible = loadEligibleJobs();
+    const entry = eligible.find(e => e.account?.id === acct.id);
+
+    expect(entry).toBeDefined();
+    expect(entry!.account!.appClientId).toBe('preset-ios');
+  });
+
+  it('returns account with appClientId null when no client is assigned', () => {
+    const acct = insertAccount({ disabled: 0 }); // no app_client_id set
+    insertJob({ accountId: acct.id, jobType: 'checkin' });
+
+    const eligible = loadEligibleJobs();
+    const entry = eligible.find(e => e.account?.id === acct.id);
+
+    expect(entry!.account!.appClientId).toBeNull();
   });
 });

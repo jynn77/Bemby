@@ -2,6 +2,18 @@ export type AuthStatus = 'unauthenticated' | 'pending_code' | 'pending_2fa' | 'a
 export type JobType = 'checkin' | 'embywatch' | 'custom';
 export type LogStatus = 'success' | 'failed' | 'running';
 
+export type TgAppClient = {
+  id: string;
+  name: string;
+  deviceModel: string;
+  systemVersion: string;
+  appVersion: string;
+  langCode: string;
+  langPack: string;
+  systemLangCode: string;
+  isDefault: boolean;
+};
+
 export type TgAccount = {
   id: number;
   name: string;
@@ -12,6 +24,7 @@ export type TgAccount = {
   authStatus: AuthStatus;
   proxyId: string | null;
   disabled: boolean;
+  appClientId: string | null;
   createdAt: string;
 };
 

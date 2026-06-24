@@ -20,6 +20,7 @@ export const ALLOWED_KEYS = [
   "notify_tg_events",
   "ua_presets",
   "proxies",
+  "tg_app_clients",
 ];
 
 router.get("/", (_req, res) => {

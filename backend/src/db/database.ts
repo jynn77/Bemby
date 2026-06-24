@@ -96,6 +96,21 @@ try { db.exec('ALTER TABLE job_logs ADD COLUMN retired INTEGER NOT NULL DEFAULT 
 try { db.exec('ALTER TABLE jobs ADD COLUMN template_id INTEGER REFERENCES job_templates(id) ON DELETE SET NULL'); } catch {}
 try { db.exec('ALTER TABLE tg_accounts ADD COLUMN proxy_id TEXT'); } catch {}
 try { db.exec('ALTER TABLE tg_accounts ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE tg_accounts ADD COLUMN app_client_id TEXT'); } catch {}
+
+// Seed default TG app client profiles (Linux is default)
+try {
+  db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)").run(
+    'tg_app_clients',
+    JSON.stringify([
+      { id: 'preset-ios',     name: 'iOS',     deviceModel: 'iPhone 13 Pro Max', systemVersion: 'iOS 15.4.1',         appVersion: '8.4.2', langCode: 'en', langPack: 'ios',      systemLangCode: 'en-US', isDefault: false },
+      { id: 'preset-android', name: 'Android', deviceModel: 'Samsung SM-G991B',  systemVersion: 'Android 12',          appVersion: '9.1.1', langCode: 'en', langPack: 'android',  systemLangCode: 'en-US', isDefault: false },
+      { id: 'preset-windows', name: 'Windows', deviceModel: 'Desktop',           systemVersion: 'Windows 10',          appVersion: '4.16.5', langCode: 'en', langPack: 'tdesktop', systemLangCode: 'en-US', isDefault: false },
+      { id: 'preset-mac',     name: 'Mac',     deviceModel: 'MacBook Pro',       systemVersion: 'macOS 13.2',          appVersion: '8.4.2', langCode: 'en', langPack: 'macos',    systemLangCode: 'en-US', isDefault: false },
+      { id: 'preset-linux',   name: 'Linux',   deviceModel: 'PC 64bit',          systemVersion: 'Ubuntu 22.04 LTS',    appVersion: '4.16.5', langCode: 'en', langPack: 'tdesktop', systemLangCode: 'en-US', isDefault: true  },
+    ])
+  );
+} catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS job_templates (

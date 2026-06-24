@@ -3,6 +3,15 @@ import { LogLevel } from 'telegram/extensions/Logger';
 import { StringSession } from 'telegram/sessions';
 import type { TgProxy } from '../types';
 
+export type TgDeviceParams = {
+  deviceModel?: string;
+  systemVersion?: string;
+  appVersion?: string;
+  langCode?: string;
+  langPack?: string;
+  systemLangCode?: string;
+};
+
 export type TgAccountStatus = {
   isActive: boolean;
   isDeleted: boolean;
@@ -24,7 +33,7 @@ type PendingAuth = {
 // In-memory pending auth sessions keyed by account ID
 const pending = new Map<number, PendingAuth>();
 
-export async function requestCode(accountId: number, apiId: number, apiHash: string, phoneNumber: string, proxy?: TgProxy): Promise<void> {
+export async function requestCode(accountId: number, apiId: number, apiHash: string, phoneNumber: string, proxy?: TgProxy, deviceParams?: TgDeviceParams): Promise<void> {
   const existing = pending.get(accountId);
   if (existing) {
     await existing.client.disconnect().catch(() => undefined);
@@ -35,7 +44,7 @@ export async function requestCode(accountId: number, apiId: number, apiHash: str
     new StringSession(''),
     apiId,
     apiHash,
-    { connectionRetries: 3, baseLogger: new Logger(LogLevel.NONE), ...(proxy ? { proxy } : {}) },
+    { connectionRetries: 3, baseLogger: new Logger(LogLevel.NONE), ...(proxy ? { proxy } : {}), ...(deviceParams ?? {}) },
   );
   await client.connect();
 
@@ -75,12 +84,13 @@ export async function checkAccountStatus(
   apiHash: string,
   sessionString: string,
   proxy?: TgProxy,
+  deviceParams?: TgDeviceParams,
 ): Promise<TgAccountStatus> {
   const client = new TelegramClient(
     new StringSession(sessionString),
     apiId,
     apiHash,
-    { connectionRetries: 3, baseLogger: new Logger(LogLevel.NONE), ...(proxy ? { proxy } : {}) },
+    { connectionRetries: 3, baseLogger: new Logger(LogLevel.NONE), ...(proxy ? { proxy } : {}), ...(deviceParams ?? {}) },
   );
 
   try {

@@ -25,6 +25,7 @@
               <td>
                 {{ a.name }}
                 <span v-if="a.disabled" class="badge badge-grey" style="margin-left:6px;font-size:10px">{{ t('accounts.disabled') }}</span>
+                <span v-if="a.appClientId" class="badge badge-blue" style="margin-left:4px;font-size:10px">{{ appClientsList.find(c => c.id === a.appClientId)?.name ?? a.appClientId }}</span>
               </td>
               <td>{{ a.phoneNumber }}</td>
               <td><span :class="statusBadge(a.authStatus)">{{ t(`accounts.status.${a.authStatus}`) }}</span></td>
@@ -87,6 +88,13 @@
           <select v-model="form.proxyId" class="form-select">
             <option value="">{{ t('accounts.proxyNone') }}</option>
             <option v-for="p in proxiesList" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ t('accounts.labelAppClient') }}</label>
+          <select v-model="form.appClientId" class="form-select">
+            <option value="">{{ t('accounts.appClientDefault') }}{{ defaultClientName ? ` (${defaultClientName})` : '' }}</option>
+            <option v-for="c in appClientsList" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
         <div class="modal-footer">
@@ -191,20 +199,26 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { accountsApi, settingsApi, type Account, type Proxy, type TgAccountStatus } from '../api/client';
+import { accountsApi, settingsApi, type Account, type Proxy, type TgAppClient, type TgAccountStatus } from '../api/client';
 import { t, locale } from '../i18n';
 
 const accounts = ref<Account[]>([]);
-const settings = ref<{ proxies?: string } | null>(null);
+const settings = ref<{ proxies?: string; tg_app_clients?: string } | null>(null);
 
 const proxiesList = computed<Proxy[]>(() => {
   try { return JSON.parse(settings.value?.proxies ?? '[]'); } catch { return []; }
 });
 
+const appClientsList = computed<TgAppClient[]>(() => {
+  try { return JSON.parse(settings.value?.tg_app_clients ?? '[]'); } catch { return []; }
+});
+
+const defaultClientName = computed(() => appClientsList.value.find(c => c.isDefault)?.name ?? '');
+
 // ── Form state ────────────────────────────────────────────────────────────────
 const showForm = ref(false);
 const editTarget = ref<Account | null>(null);
-const form = reactive({ name: '', phoneNumber: '', apiId: '', apiHash: '', proxyId: '' });
+const form = reactive({ name: '', phoneNumber: '', apiId: '', apiHash: '', proxyId: '', appClientId: '' });
 const formError = ref('');
 const saving = ref(false);
 
@@ -253,14 +267,14 @@ function fmtDate(iso: string) {
 // ── Add / Edit ─────────────────────────────────────────────────────────────────
 function openAdd() {
   editTarget.value = null;
-  Object.assign(form, { name: '', phoneNumber: '', apiId: '', apiHash: '', proxyId: '' });
+  Object.assign(form, { name: '', phoneNumber: '', apiId: '', apiHash: '', proxyId: '', appClientId: '' });
   formError.value = '';
   showForm.value = true;
 }
 
 function openEdit(a: Account) {
   editTarget.value = a;
-  Object.assign(form, { name: a.name, phoneNumber: a.phoneNumber, apiId: String(a.apiId), apiHash: '', proxyId: a.proxyId ?? '' });
+  Object.assign(form, { name: a.name, phoneNumber: a.phoneNumber, apiId: String(a.apiId), apiHash: '', proxyId: a.proxyId ?? '', appClientId: a.appClientId ?? '' });
   formError.value = '';
   showForm.value = true;
 }
@@ -276,6 +290,7 @@ async function saveAccount() {
         apiId: Number(form.apiId),
         ...(form.apiHash ? { apiHash: form.apiHash } : {}),
         proxyId: form.proxyId || null,
+        appClientId: form.appClientId || null,
       });
     } else {
       await accountsApi.create({
@@ -284,6 +299,7 @@ async function saveAccount() {
         apiId: Number(form.apiId),
         apiHash: form.apiHash,
         proxyId: form.proxyId || null,
+        appClientId: form.appClientId || null,
       });
     }
     showForm.value = false;

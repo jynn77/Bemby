@@ -1,8 +1,9 @@
-import type { Job, TgAccount, EmbywatchConfig, EmbywatchLog, TgProxy } from '../types';
+import type { Job, TgAccount, EmbywatchConfig, EmbywatchLog, TgProxy, TgAppClient } from '../types';
 import { runCheckin, CheckinError, type CheckinAttemptLog } from './checkin';
 import { runEmbywatch } from './embywatch';
 import { runCustom, CustomJobError, type CustomJobLog } from './custom';
 import { db } from '../db/database';
+import type { TgDeviceParams } from '../auth/tgAuth';
 
 function resolveProxyUrl(jobConfig: string | null, templateId: number | null | undefined, accountProxyId?: string | null): string | undefined {
   // Account proxy takes priority over job/template proxy
@@ -31,6 +32,24 @@ function resolveProxyUrl(jobConfig: string | null, templateId: number | null | u
     if (!row?.value) return undefined;
     const list = JSON.parse(row.value) as Array<{ id: string; url: string }>;
     return list.find(p => p.id === proxyId)?.url;
+  } catch { return undefined; }
+}
+
+function resolveAppClientParams(appClientId: string | null | undefined): TgDeviceParams | undefined {
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_app_clients') as { value: string } | undefined;
+    if (!row?.value) return undefined;
+    const list = JSON.parse(row.value) as TgAppClient[];
+    const client = appClientId ? list.find(c => c.id === appClientId) : list.find(c => c.isDefault);
+    if (!client) return undefined;
+    return {
+      deviceModel: client.deviceModel,
+      systemVersion: client.systemVersion,
+      appVersion: client.appVersion,
+      langCode: client.langCode,
+      langPack: client.langPack,
+      systemLangCode: client.systemLangCode,
+    };
   } catch { return undefined; }
 }
 
@@ -79,10 +98,11 @@ export async function runJob(
           if (!account.sessionString) throw new Error('Account has no session -- authenticate first');
           const checkinProxyUrl = resolveProxyUrl(job.config, job.templateId, account.proxyId);
           const checkinProxy = parseTgProxy(checkinProxyUrl);
+          const checkinDevice = resolveAppClientParams(account.appClientId);
           const log = await runCheckin(
             account.apiId, account.apiHash, account.sessionString,
             job.botUsername, job.replyTimeoutMs, job.startCommand, job.checkinButton, attempt, job.retryMax, signal,
-            checkinProxy,
+            checkinProxy, checkinDevice,
           );
           detailLogs?.push(log);
           break;
@@ -111,9 +131,10 @@ export async function runJob(
           const rawCfg = JSON.parse(job.config ?? '{"actions":[]}');
           const customProxyUrl = resolveProxyUrl(job.config, job.templateId, account.proxyId);
           const customProxy = parseTgProxy(customProxyUrl);
+          const customDevice = resolveAppClientParams(account.appClientId);
           const customLog = await runCustom(
             account.apiId, account.apiHash, account.sessionString,
-            job.botUsername, rawCfg, signal, customProxy,
+            job.botUsername, rawCfg, signal, customProxy, customDevice,
           );
           detailLogs?.push(customLog);
           break;
