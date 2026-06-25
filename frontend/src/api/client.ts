@@ -618,20 +618,21 @@ export type TgFolder = {
 };
 
 export const tgClientApi = {
-  dialogs: (accountId: number, params?: { limit?: number }) =>
+  dialogs: (accountId: number, params?: { limit?: number }, signal?: AbortSignal) =>
     api
-      .get<TgDialog[]>(`/tg-client/${accountId}/dialogs`, { params })
+      .get<TgDialog[]>(`/tg-client/${accountId}/dialogs`, { params, signal })
       .then((r) => r.data),
 
   messages: (
     accountId: number,
     chatId: string,
     params?: { limit?: number; offsetId?: number },
+    signal?: AbortSignal,
   ) =>
     api
       .get<
         TgMessage[]
-      >(`/tg-client/${accountId}/messages/${encodeURIComponent(chatId)}`, { params })
+      >(`/tg-client/${accountId}/messages/${encodeURIComponent(chatId)}`, { params, signal })
       .then((r) => r.data),
 
   send: (

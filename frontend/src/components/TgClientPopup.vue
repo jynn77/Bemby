@@ -867,6 +867,41 @@ const threadEl = ref<HTMLElement | null>(null);
 
 // Context menu for dialog actions
 const ctxMenu = ref<{ dialog: TgDialog; x: number; y: number } | null>(null);
+// ── Priority request management ───────────────────────────────────────────────
+// bgDialogCtrl: the in-flight background 200-dialog fetch -- aborted when the
+// user initiates any action so their request gets the connection immediately.
+let bgDialogCtrl: AbortController | null = null;
+// msgFetchCtrl: the in-flight messages fetch -- aborted if the user switches
+// chats before the previous fetch completes.
+let msgFetchCtrl: AbortController | null = null;
+
+function cancelBgDialogLoad() {
+  bgDialogCtrl?.abort();
+  bgDialogCtrl = null;
+}
+
+// Kick off (or re-kick) the full 200-dialog background load.
+function startBgDialogLoad(accountId: number) {
+  cancelBgDialogLoad();
+  bgDialogCtrl = new AbortController();
+  const ctrl = bgDialogCtrl;
+  tgClientApi
+    .dialogs(accountId, { limit: 200 }, ctrl.signal)
+    .then((allDialogs) => {
+      bgDialogCtrl = null;
+      if (selectedAccountId.value !== accountId) return;
+      const localZeroed = new Set(
+        dialogs.value.filter((d) => d.unreadCount === 0).map((d) => d.chatId),
+      );
+      dialogs.value = allDialogs.map((d) =>
+        localZeroed.has(d.chatId) ? { ...d, unreadCount: 0 } : d,
+      );
+    })
+    .catch(() => {
+      if (ctrl.signal.aborted) return; // expected cancellation -- not an error
+    });
+}
+
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 const tgFolders = ref<TgFolder[]>([]);
 const activeFolder = ref<"all" | number>("all");
@@ -1466,19 +1501,8 @@ async function loadDialogs() {
     tgFolders.value = folders;
     loadingDialogs.value = false;
 
-    // Background: load full list and merge in
-    tgClientApi.dialogs(accountId, { limit: 200 }).then((allDialogs) => {
-      if (selectedAccountId.value !== accountId) return;
-      // Merge: keep any local unread-zero overrides already applied
-      const localZeroed = new Set(
-        dialogs.value.filter((d) => d.unreadCount === 0).map((d) => d.chatId),
-      );
-      dialogs.value = allDialogs.map((d) =>
-        localZeroed.has(d.chatId) ? { ...d, unreadCount: 0 } : d,
-      );
-    }).catch(() => {
-      // Background load failing is non-fatal; first batch is already visible
-    });
+    // Background: load full 200 dialogs -- abortable when user clicks a chat
+    startBgDialogLoad(accountId);
   } catch (e: any) {
     dialogError.value =
       e?.response?.data?.error ?? e.message ?? "Failed to load chats";
@@ -1524,6 +1548,8 @@ function onSearchInput() {
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 async function openChat(dialog: TgDialog) {
+  // Cancel the background dialog load so this request gets the connection first
+  cancelBgDialogLoad();
   activeChatId.value = dialog.chatId;
   activeChat.value = dialog;
   messages.value = [];
@@ -1538,8 +1564,12 @@ async function openChat(dialog: TgDialog) {
   botCommands.value = [];
   await fetchMessages();
   markChatRead(dialog.chatId);
-  // Load bot commands in the background -- non-blocking
   if (dialog.type === "bot") loadBotCommands(dialog.chatId);
+  // Resume background dialog load 2s after messages are shown -- low priority
+  if (selectedAccountId.value) {
+    const accountId = selectedAccountId.value;
+    setTimeout(() => startBgDialogLoad(accountId), 2000);
+  }
   await nextTick();
   inputEl.value?.focus();
 }
@@ -1560,20 +1590,33 @@ function backToDialogs() {
 
 async function fetchMessages() {
   if (!selectedAccountId.value || !activeChatId.value) return;
+  // Cancel any in-flight fetch (user switched chats before previous one finished)
+  msgFetchCtrl?.abort();
+  msgFetchCtrl = new AbortController();
+  const ctrl = msgFetchCtrl;
+  const chatId = activeChatId.value;
+
   loadingMessages.value = true;
   try {
     const msgs = await tgClientApi.messages(
       selectedAccountId.value,
-      activeChatId.value,
+      chatId,
       { limit: 50 },
+      ctrl.signal,
     );
-    messages.value = msgs.reverse(); // oldest first
+    if (ctrl.signal.aborted || activeChatId.value !== chatId) return;
+    messages.value = msgs.reverse();
     if (msgs.length < 50) canLoadMore.value = false;
     await scrollBottom(true);
   } catch (e: any) {
+    if (ctrl.signal.aborted) return;
     console.error("Failed to load messages:", e);
   } finally {
-    loadingMessages.value = false;
+    // Only clear the spinner if this is still the active fetch
+    if (msgFetchCtrl === ctrl) {
+      loadingMessages.value = false;
+      msgFetchCtrl = null;
+    }
   }
 }
 
