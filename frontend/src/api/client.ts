@@ -598,6 +598,7 @@ export type TgInvitePreview = {
 export type TgMessage = {
   id: number;
   text: string;
+  html: string | null;
   date: number;
   fromMe: boolean;
   fromId: string | null;

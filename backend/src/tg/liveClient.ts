@@ -27,6 +27,7 @@ export type TgButton = {
 export type TgMsgPayload = {
   id: number;
   text: string;
+  html: string | null; // safe HTML with entity markup; null = plain text
   date: number;
   fromMe: boolean;
   fromId: string | null;
@@ -90,6 +91,85 @@ export function peerToChatId(peer: Api.TypePeer): string {
   if (peer instanceof Api.PeerChannel) return `c${peer.channelId.toString()}`;
   if (peer instanceof Api.PeerChat) return `g${peer.chatId.toString()}`;
   return "";
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Converts Telegram message entities to safe HTML. Returns null when there are
+// no formatting entities (plain text can be rendered directly).
+function entitiesToHtml(
+  text: string,
+  entities: Api.TypeMessageEntity[] | undefined,
+): string | null {
+  if (!entities?.length) return null;
+
+  type Span = { offset: number; end: number; open: string; close: string };
+  const spans: Span[] = [];
+
+  for (const e of entities) {
+    const end = e.offset + e.length;
+    if (e instanceof Api.MessageEntityTextUrl) {
+      spans.push({
+        offset: e.offset,
+        end,
+        open: `<a href="${escHtml(e.url)}" class="tgc-link" data-tgurl>`,
+        close: "</a>",
+      });
+    } else if (e instanceof Api.MessageEntityUrl) {
+      const url = text.slice(e.offset, end);
+      spans.push({
+        offset: e.offset,
+        end,
+        open: `<a href="${escHtml(url)}" class="tgc-link" data-tgurl>`,
+        close: "</a>",
+      });
+    } else if (e instanceof Api.MessageEntityMention) {
+      const handle = text.slice(e.offset + 1, end); // strip leading @
+      spans.push({
+        offset: e.offset,
+        end,
+        open: `<a href="https://t.me/${escHtml(handle)}" class="tgc-link" data-tgurl>`,
+        close: "</a>",
+      });
+    } else if (e instanceof Api.MessageEntityBold) {
+      spans.push({
+        offset: e.offset,
+        end,
+        open: "<strong>",
+        close: "</strong>",
+      });
+    } else if (e instanceof Api.MessageEntityItalic) {
+      spans.push({ offset: e.offset, end, open: "<em>", close: "</em>" });
+    } else if (e instanceof Api.MessageEntityUnderline) {
+      spans.push({ offset: e.offset, end, open: "<u>", close: "</u>" });
+    } else if (e instanceof Api.MessageEntityStrike) {
+      spans.push({ offset: e.offset, end, open: "<s>", close: "</s>" });
+    } else if (e instanceof Api.MessageEntityCode) {
+      spans.push({ offset: e.offset, end, open: "<code>", close: "</code>" });
+    } else if (e instanceof Api.MessageEntityPre) {
+      spans.push({ offset: e.offset, end, open: "<pre>", close: "</pre>" });
+    }
+  }
+
+  if (!spans.length) return null;
+
+  // Sort by offset ascending; longer spans first at same offset
+  spans.sort((a, b) => a.offset - b.offset || b.end - a.end);
+
+  let html = "";
+  let pos = 0;
+  for (const span of spans) {
+    if (span.offset < pos) continue; // skip overlapping spans
+    if (span.offset > pos)
+      html += escHtml(text.slice(pos, span.offset)).replace(/\n/g, "<br>");
+    html += span.open + escHtml(text.slice(span.offset, span.end)) + span.close;
+    pos = span.end;
+  }
+  if (pos < text.length)
+    html += escHtml(text.slice(pos)).replace(/\n/g, "<br>");
+  return html;
 }
 
 function entityName(entity: Api.User | Api.Chat | Api.Channel): string {
@@ -179,19 +259,23 @@ function resolveDeviceParams(
 export async function reconnectClient(accountId: number): Promise<void> {
   const entry = liveClients.get(accountId);
   if (entry) {
-    try { await entry.client.disconnect(); } catch { /* ignore */ }
+    try {
+      await entry.client.disconnect();
+    } catch {
+      /* ignore */
+    }
     liveClients.delete(accountId);
   }
   await getLiveClient(accountId);
 }
 
 const AUTH_ERROR_CODES = [
-  'AUTH_KEY_DUPLICATED',
-  'AUTH_KEY_INVALID',
-  'SESSION_REVOKED',
-  'SESSION_EXPIRED',
-  'USER_DEACTIVATED',
-  'USER_DEACTIVATED_BAN',
+  "AUTH_KEY_DUPLICATED",
+  "AUTH_KEY_INVALID",
+  "SESSION_REVOKED",
+  "SESSION_EXPIRED",
+  "USER_DEACTIVATED",
+  "USER_DEACTIVATED_BAN",
 ];
 
 export function isAuthError(msg: string): boolean {
@@ -199,7 +283,9 @@ export function isAuthError(msg: string): boolean {
 }
 
 export function markSessionExpired(accountId: number): void {
-  db.prepare("UPDATE tg_accounts SET auth_status = 'session_expired' WHERE id = ?").run(accountId);
+  db.prepare(
+    "UPDATE tg_accounts SET auth_status = 'session_expired' WHERE id = ?",
+  ).run(accountId);
   const entry = liveClients.get(accountId);
   if (entry) {
     entry.client.disconnect().catch(() => {});
@@ -241,8 +327,10 @@ export async function getLiveClient(accountId: number): Promise<LiveEntry> {
   try {
     await client.connect();
   } catch (err: any) {
-    if (isAuthError(err?.message ?? '')) {
-      db.prepare("UPDATE tg_accounts SET auth_status = 'session_expired' WHERE id = ?").run(accountId);
+    if (isAuthError(err?.message ?? "")) {
+      db.prepare(
+        "UPDATE tg_accounts SET auth_status = 'session_expired' WHERE id = ?",
+      ).run(accountId);
     }
     throw err;
   }
@@ -269,6 +357,7 @@ export async function getLiveClient(accountId: number): Promise<LiveEntry> {
       message: {
         id: msg.id,
         text: msg.message ?? "",
+        html: entitiesToHtml(msg.message ?? "", msg.entities),
         date: msg.date,
         fromMe: Boolean(msg.out),
         fromId: msg.fromId ? peerToChatId(msg.fromId as Api.TypePeer) : null,
@@ -401,6 +490,7 @@ export async function getMessages(
     return {
       id: msg.id,
       text: msg.message ?? "",
+      html: entitiesToHtml(msg.message ?? "", (msg as Api.Message).entities),
       date: msg.date,
       fromMe: Boolean(msg.out),
       fromId: msg.fromId ? peerToChatId(msg.fromId as Api.TypePeer) : null,
@@ -874,6 +964,7 @@ export async function getThreadMessages(
     return {
       id: msg.id,
       text: msg.message ?? "",
+      html: entitiesToHtml(msg.message ?? "", msg.entities),
       date: msg.date,
       fromMe: Boolean(msg.out),
       fromId: msg.fromId ? peerToChatId(msg.fromId as Api.TypePeer) : null,
@@ -928,8 +1019,7 @@ export async function resolvePeer(
       chatId = `u${entity.id}`;
       type = entity.bot ? "bot" : "user";
       name =
-        [entity.firstName, entity.lastName].filter(Boolean).join(" ") ||
-        query;
+        [entity.firstName, entity.lastName].filter(Boolean).join(" ") || query;
       uname = entity.username ?? null;
     } else if (entity instanceof Api.Channel) {
       chatId = `c${entity.id}`;
@@ -944,7 +1034,14 @@ export async function resolvePeer(
       return null;
     }
     entry.entityCache.set(chatId, entity as Api.User | Api.Chat | Api.Channel);
-    return { chatId, name, type, username: uname, unreadCount: 0, lastMessage: null };
+    return {
+      chatId,
+      name,
+      type,
+      username: uname,
+      unreadCount: 0,
+      lastMessage: null,
+    };
   } catch {
     return null;
   }
@@ -997,7 +1094,14 @@ export async function checkInvite(
       memberCount = (chat as any).participantsCount ?? 0;
       entry.entityCache.set(chatId, chat);
     }
-    return { hash, title, memberCount, type, alreadyJoined: true, chatId: chatId || undefined };
+    return {
+      hash,
+      title,
+      memberCount,
+      type,
+      alreadyJoined: true,
+      chatId: chatId || undefined,
+    };
   }
   const invite = result as Api.ChatInvite;
   const type: "group" | "channel" =

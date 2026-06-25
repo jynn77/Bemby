@@ -3,7 +3,13 @@
     :class="inline ? 'tgc-inline-wrap' : 'tgc-backdrop'"
     @click.self="inline ? undefined : $emit('close')"
   >
-    <div class="tgc-popup" :class="{ 'mobile-chat-open': showMobileChat, 'tgc-popup-inline': inline }">
+    <div
+      class="tgc-popup"
+      :class="{
+        'mobile-chat-open': showMobileChat,
+        'tgc-popup-inline': inline,
+      }"
+    >
       <!-- Header -->
       <div class="tgc-header">
         <div class="tgc-header-left">
@@ -102,15 +108,22 @@
               <span class="tgc-spinner"></span>
             </div>
             <div v-else-if="dialogError" class="tgc-list-error">
-              <i class="fa-solid fa-triangle-exclamation tgc-list-error-icon"></i>
+              <i
+                class="fa-solid fa-triangle-exclamation tgc-list-error-icon"
+              ></i>
               <span>{{ dialogError }}</span>
               <button
                 class="tgc-reconnect-btn"
                 :disabled="reconnecting"
                 @click="reconnectAccount"
               >
-                <span v-if="reconnecting"><span class="tgc-spinner tgc-spinner-sm"></span> Reconnecting...</span>
-                <span v-else><i class="fa-solid fa-rotate-right"></i> Reconnect</span>
+                <span v-if="reconnecting"
+                  ><span class="tgc-spinner tgc-spinner-sm"></span>
+                  Reconnecting...</span
+                >
+                <span v-else
+                  ><i class="fa-solid fa-rotate-right"></i> Reconnect</span
+                >
               </button>
             </div>
             <template v-else>
@@ -169,7 +182,12 @@
         <template v-if="activeChat">
           <div class="tgc-chat">
             <div class="tgc-chat-header">
-              <button v-show="showMobileChat" class="tgc-back-btn" @click="backToDialogs" title="Back to chats">
+              <button
+                v-show="showMobileChat"
+                class="tgc-back-btn"
+                @click="backToDialogs"
+                title="Back to chats"
+              >
                 <i class="fa-solid fa-arrow-left"></i>
                 <span class="tgc-back-label">Back</span>
               </button>
@@ -199,12 +217,21 @@
                   @{{ activeChat.username }}
                 </div>
               </div>
-              <button class="tgc-icon-btn tgc-chat-close-btn" @click="$emit('close')" title="Close">
+              <button
+                class="tgc-icon-btn tgc-chat-close-btn"
+                @click="$emit('close')"
+                title="Close"
+              >
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
 
-            <div class="tgc-messages" ref="messagesEl" @scroll="onMsgScroll" @click="activeMsgId = null">
+            <div
+              class="tgc-messages"
+              ref="messagesEl"
+              @scroll="onMsgScroll"
+              @click="activeMsgId = null"
+            >
               <div v-if="loadingOlder" class="tgc-load-more">
                 <span class="tgc-spinner"></span>
               </div>
@@ -241,7 +268,10 @@
 
                   <div
                     class="tgc-msg-wrap"
-                    :class="[msg.fromMe ? 'tgc-msg-out' : 'tgc-msg-in', { 'tgc-msg-active': activeMsgId === msg.id }]"
+                    :class="[
+                      msg.fromMe ? 'tgc-msg-out' : 'tgc-msg-in',
+                      { 'tgc-msg-active': activeMsgId === msg.id },
+                    ]"
                   >
                     <!-- Hover action bar -->
                     <div class="tgc-msg-actions">
@@ -269,7 +299,12 @@
                       </button>
                     </div>
 
-                    <div class="tgc-msg-bubble" @click.stop="activeMsgId = activeMsgId === msg.id ? null : msg.id">
+                    <div
+                      class="tgc-msg-bubble"
+                      @click.stop="
+                        activeMsgId = activeMsgId === msg.id ? null : msg.id
+                      "
+                    >
                       <div
                         v-if="
                           !msg.fromMe &&
@@ -308,9 +343,12 @@
                               'none')
                         "
                       />
-                      <div v-if="msg.text" class="tgc-msg-text">
-                        {{ msg.text }}
-                      </div>
+                      <div
+                        v-if="msg.text || msg.html"
+                        class="tgc-msg-text"
+                        v-html="msg.html ?? escMsgText(msg.text)"
+                        @click="onMsgLinkClick($event)"
+                      ></div>
                       <div
                         v-if="!msg.text && msg.hasDocument"
                         class="tgc-msg-text tgc-msg-doc"
@@ -580,7 +618,11 @@
                   <div class="tgc-thread-msg-name" v-if="!msg.fromMe">
                     {{ msg.fromName || "User" }}
                   </div>
-                  <div class="tgc-thread-msg-text">{{ msg.text }}</div>
+                  <div
+                    class="tgc-thread-msg-text"
+                    v-html="msg.html ?? escMsgText(msg.text)"
+                    @click="onMsgLinkClick($event)"
+                  ></div>
                   <div class="tgc-thread-msg-time">
                     {{ fmtMsgTime(msg.date) }}
                   </div>
@@ -781,24 +823,49 @@
     </div>
   </div>
   <!-- Invite link join confirmation -->
-  <div v-if="invitePreview || checkingInvite" class="tgc-invite-overlay" @click.self="invitePreview = null">
+  <div
+    v-if="invitePreview || checkingInvite"
+    class="tgc-invite-overlay"
+    @click.self="invitePreview = null"
+  >
     <div class="tgc-invite-card">
       <template v-if="checkingInvite">
-        <span class="tgc-spinner" style="margin: 24px auto;display:block;width:28px;height:28px;"></span>
+        <span
+          class="tgc-spinner"
+          style="margin: 24px auto; display: block; width: 28px; height: 28px"
+        ></span>
       </template>
       <template v-else-if="invitePreview">
         <div class="tgc-invite-icon">
-          <i :class="invitePreview.type === 'channel' ? 'fa-solid fa-bullhorn' : 'fa-solid fa-users'"></i>
+          <i
+            :class="
+              invitePreview.type === 'channel'
+                ? 'fa-solid fa-bullhorn'
+                : 'fa-solid fa-users'
+            "
+          ></i>
         </div>
         <div class="tgc-invite-title">{{ invitePreview.title }}</div>
         <div class="tgc-invite-meta">
-          {{ invitePreview.memberCount.toLocaleString() }} {{ invitePreview.type === 'channel' ? 'subscribers' : 'members' }}
+          {{ invitePreview.memberCount.toLocaleString() }}
+          {{ invitePreview.type === "channel" ? "subscribers" : "members" }}
         </div>
         <div class="tgc-invite-actions">
-          <button class="tgc-invite-cancel" @click="invitePreview = null">Cancel</button>
-          <button class="tgc-invite-join" :disabled="joiningInvite" @click="confirmJoinInvite">
-            <span v-if="joiningInvite"><span class="tgc-spinner tgc-spinner-sm"></span> Joining...</span>
-            <span v-else>Join {{ invitePreview.type === 'channel' ? 'Channel' : 'Group' }}</span>
+          <button class="tgc-invite-cancel" @click="invitePreview = null">
+            Cancel
+          </button>
+          <button
+            class="tgc-invite-join"
+            :disabled="joiningInvite"
+            @click="confirmJoinInvite"
+          >
+            <span v-if="joiningInvite"
+              ><span class="tgc-spinner tgc-spinner-sm"></span> Joining...</span
+            >
+            <span v-else
+              >Join
+              {{ invitePreview.type === "channel" ? "Channel" : "Group" }}</span
+            >
           </button>
         </div>
       </template>
@@ -1149,6 +1216,24 @@ async function copyField(value: string) {
 // Invite links (t.me/+HASH or t.me/joinchat/HASH) show an in-app join confirmation.
 // URLs with query params (?start=, ?startapp=), non-numeric path segments (Mini App paths
 // like t.me/bot/app), and non-TG URLs all fall through to the browser.
+function escMsgText(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+}
+
+function onMsgLinkClick(e: MouseEvent) {
+  const a = (e.target as HTMLElement).closest("a");
+  if (!a) return;
+  const href = a.getAttribute("href");
+  if (!href) return;
+  e.preventDefault();
+  e.stopPropagation();
+  handleTgUrl(href);
+}
+
 async function handleTgUrl(url: string) {
   if (!selectedAccountId.value) {
     window.open(url, "_blank", "noopener");
@@ -1163,7 +1248,10 @@ async function handleTgUrl(url: string) {
     const hash = inviteM[1];
     checkingInvite.value = true;
     try {
-      const preview = await tgClientApi.checkInvite(selectedAccountId.value, hash);
+      const preview = await tgClientApi.checkInvite(
+        selectedAccountId.value,
+        hash,
+      );
       if (preview.alreadyJoined && preview.chatId) {
         await openChat({
           chatId: preview.chatId,
@@ -1177,9 +1265,12 @@ async function handleTgUrl(url: string) {
         invitePreview.value = preview;
       }
     } catch {
-      copyToast.value = "Could not load group info -- try the official Telegram app";
+      copyToast.value =
+        "Could not load group info -- try the official Telegram app";
       if (copyToastTimer) clearTimeout(copyToastTimer);
-      copyToastTimer = setTimeout(() => { copyToast.value = ""; }, 4000);
+      copyToastTimer = setTimeout(() => {
+        copyToast.value = "";
+      }, 4000);
     } finally {
       checkingInvite.value = false;
     }
@@ -1192,9 +1283,16 @@ async function handleTgUrl(url: string) {
     /https?:\/\/t(?:elegram)?\.me\/([A-Za-z]\w+)(?:\/(\d+))?$/i,
   );
   const username = m?.[1];
-  if (username && username.toLowerCase() !== "joinchat" && username.toLowerCase() !== "s") {
+  if (
+    username &&
+    username.toLowerCase() !== "joinchat" &&
+    username.toLowerCase() !== "s"
+  ) {
     try {
-      const dialog = await tgClientApi.resolvePeer(selectedAccountId.value, username);
+      const dialog = await tgClientApi.resolvePeer(
+        selectedAccountId.value,
+        username,
+      );
       await openChat(dialog);
       return;
     } catch {
@@ -1216,7 +1314,9 @@ async function confirmJoinInvite() {
     const raw = e?.response?.data?.error ?? e?.message ?? "Failed to join";
     copyToast.value = friendlyTgError(raw);
     if (copyToastTimer) clearTimeout(copyToastTimer);
-    copyToastTimer = setTimeout(() => { copyToast.value = ""; }, 4000);
+    copyToastTimer = setTimeout(() => {
+      copyToast.value = "";
+    }, 4000);
   } finally {
     joiningInvite.value = false;
   }
@@ -1224,7 +1324,12 @@ async function confirmJoinInvite() {
 
 async function clickInlineButton(
   msg: TgMessage,
-  btn: { text: string; data: string | null; url: string | null; webApp: boolean },
+  btn: {
+    text: string;
+    data: string | null;
+    url: string | null;
+    webApp: boolean;
+  },
   ri: number,
   bi: number,
 ) {
@@ -1611,7 +1716,11 @@ function friendlyTgError(raw: string): string {
     return "Too many requests -- Telegram has asked us to slow down. Please wait a moment and try again.";
   if (raw.includes("PHONE_NUMBER_BANNED"))
     return "This phone number is banned from Telegram.";
-  if (raw.includes("CONNECTION") || raw.includes("NETWORK") || raw.includes("ECONNREFUSED"))
+  if (
+    raw.includes("CONNECTION") ||
+    raw.includes("NETWORK") ||
+    raw.includes("ECONNREFUSED")
+  )
     return "Network error connecting to Telegram. Check your server connection and try again.";
   return raw;
 }
@@ -1635,7 +1744,9 @@ async function reconnectAccount() {
     await tgClientApi.reconnect(selectedAccountId.value);
     await loadDialogs();
   } catch (e: any) {
-    dialogError.value = friendlyTgError(e?.response?.data?.error ?? e?.message ?? "Reconnect failed");
+    dialogError.value = friendlyTgError(
+      e?.response?.data?.error ?? e?.message ?? "Reconnect failed",
+    );
   } finally {
     reconnecting.value = false;
   }
@@ -1661,7 +1772,8 @@ async function loadDialogs() {
     // Background: load full 200 dialogs -- abortable when user clicks a chat
     startBgDialogLoad(accountId);
   } catch (e: any) {
-    const raw = e?.response?.data?.error ?? e?.message ?? "Failed to load chats";
+    const raw =
+      e?.response?.data?.error ?? e?.message ?? "Failed to load chats";
     dialogError.value = friendlyTgError(raw);
     loadingDialogs.value = false;
   }
@@ -1736,7 +1848,8 @@ function markChatRead(chatId: string) {
   const maxId = Math.max(...messages.value.map((m) => m.id));
   // Clear badge immediately in UI
   const idx = dialogs.value.findIndex((d) => d.chatId === chatId);
-  if (idx !== -1) dialogs.value[idx] = { ...dialogs.value[idx], unreadCount: 0 };
+  if (idx !== -1)
+    dialogs.value[idx] = { ...dialogs.value[idx], unreadCount: 0 };
   // Fire-and-forget -- non-blocking
   tgClientApi.markRead(selectedAccountId.value, chatId, maxId).catch(() => {});
 }
@@ -2494,6 +2607,13 @@ async function addContactSubmit() {
 
 .tgc-msg-text {
   white-space: pre-wrap;
+}
+
+.tgc-link {
+  color: #4a9eff;
+  text-decoration: underline;
+  cursor: pointer;
+  word-break: break-all;
 }
 
 .tgc-msg-doc {
