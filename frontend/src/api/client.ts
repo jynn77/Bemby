@@ -463,6 +463,80 @@ export const dataApi = {
       .then((r) => r.data),
 };
 
+// ── TG Live Client ────────────────────────────────────────────────────────────
+
+export type TgDialog = {
+  chatId: string;
+  name: string;
+  type: 'user' | 'bot' | 'group' | 'channel';
+  username: string | null;
+  unreadCount: number;
+  lastMessage: { text: string; date: number; fromMe: boolean } | null;
+};
+
+export type TgMessage = {
+  id: number;
+  text: string;
+  date: number;
+  fromMe: boolean;
+  fromId: string | null;
+  fromName: string | null;
+  hasPhoto: boolean;
+  hasDocument: boolean;
+  buttons: string[][] | null;
+};
+
+export type TgContact = {
+  chatId: string;
+  firstName: string;
+  lastName: string;
+  username: string | null;
+  phone: string | null;
+};
+
+export type TgFolder = {
+  id: number;
+  title: string;
+  emoticon: string | null;
+  includeGroups: boolean;
+  includeBroadcasts: boolean;
+  includeBots: boolean;
+  includeContacts: boolean;
+  includeNonContacts: boolean;
+  pinnedChatIds: string[];
+  includedChatIds: string[];
+  excludedChatIds: string[];
+};
+
+export const tgClientApi = {
+  dialogs: (accountId: number) =>
+    api.get<TgDialog[]>(`/tg-client/${accountId}/dialogs`).then(r => r.data),
+
+  messages: (accountId: number, chatId: string, params?: { limit?: number; offsetId?: number }) =>
+    api.get<TgMessage[]>(`/tg-client/${accountId}/messages/${encodeURIComponent(chatId)}`, { params }).then(r => r.data),
+
+  send: (accountId: number, chatId: string, text: string) =>
+    api.post<{ id: number; date: number }>(`/tg-client/${accountId}/messages/${encodeURIComponent(chatId)}`, { text }).then(r => r.data),
+
+  contacts: (accountId: number) =>
+    api.get<TgContact[]>(`/tg-client/${accountId}/contacts`).then(r => r.data),
+
+  addContact: (accountId: number, phone: string, firstName: string, lastName?: string) =>
+    api.post<TgContact>(`/tg-client/${accountId}/contacts`, { phone, firstName, lastName }).then(r => r.data),
+
+  search: (accountId: number, q: string) =>
+    api.get<TgDialog[]>(`/tg-client/${accountId}/search`, { params: { q } }).then(r => r.data),
+
+  photoUrl: (accountId: number, chatId: string, msgId: number) =>
+    `/api/tg-client/${accountId}/messages/${encodeURIComponent(chatId)}/${msgId}/photo`,
+
+  eventsUrl: (accountId: number) =>
+    `/api/tg-client/${accountId}/events`,
+
+  folders: (accountId: number) =>
+    api.get<TgFolder[]>(`/tg-client/${accountId}/folders`).then(r => r.data),
+};
+
 // ── AI Debug ──────────────────────────────────────────────────────────────────
 
 export const debugApi = {

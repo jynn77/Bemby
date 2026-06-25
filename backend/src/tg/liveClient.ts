@@ -1,0 +1,420 @@
+import { TelegramClient, Api, Logger } from 'telegram';
+import { LogLevel } from 'telegram/extensions/Logger';
+import { StringSession } from 'telegram/sessions';
+import { NewMessage, type NewMessageEvent } from 'telegram/events';
+import { db } from '../db/database';
+import { parseTgProxy } from '../jobs/runner';
+import type { TgDeviceParams } from '../auth/tgAuth';
+
+export type TgLiveMessage = {
+  chatId: string;
+  message: TgMsgPayload;
+};
+
+export type TgMsgPayload = {
+  id: number;
+  text: string;
+  date: number;
+  fromMe: boolean;
+  fromId: string | null;
+  fromName: string | null;
+  hasPhoto: boolean;
+  hasDocument: boolean;
+  buttons: string[][] | null;
+};
+
+export type TgDialogItem = {
+  chatId: string;
+  name: string;
+  type: 'user' | 'bot' | 'group' | 'channel';
+  username: string | null;
+  unreadCount: number;
+  lastMessage: { text: string; date: number; fromMe: boolean } | null;
+};
+
+export type TgContactItem = {
+  chatId: string;
+  firstName: string;
+  lastName: string;
+  username: string | null;
+  phone: string | null;
+};
+
+type LiveEntry = {
+  client: TelegramClient;
+  entityCache: Map<string, Api.User | Api.Chat | Api.Channel>;
+  subscribers: Set<(msg: TgLiveMessage) => void>;
+};
+
+const liveClients = new Map<number, LiveEntry>();
+
+type AccountRow = {
+  api_id: number;
+  api_hash: string;
+  session_string: string | null;
+  proxy_id: string | null;
+  app_client_id: string | null;
+};
+
+// Derive a stable chatId string from an entity
+export function entityToChatId(entity: Api.User | Api.Chat | Api.Channel): string {
+  const id = entity.id.toString();
+  if (entity instanceof Api.User) return `u${id}`;
+  if (entity instanceof Api.Channel) return `c${id}`;
+  return `g${id}`;
+}
+
+// Build chatId from a peer reference
+export function peerToChatId(peer: Api.TypePeer): string {
+  if (peer instanceof Api.PeerUser) return `u${peer.userId.toString()}`;
+  if (peer instanceof Api.PeerChannel) return `c${peer.channelId.toString()}`;
+  if (peer instanceof Api.PeerChat) return `g${peer.chatId.toString()}`;
+  return '';
+}
+
+function entityName(entity: Api.User | Api.Chat | Api.Channel): string {
+  if (entity instanceof Api.User) {
+    return [entity.firstName, entity.lastName].filter(Boolean).join(' ') || entity.username || 'Unknown';
+  }
+  return (entity as any).title ?? (entity as any).username ?? 'Unknown';
+}
+
+function extractButtons(msg: Api.Message): string[][] | null {
+  if (!msg.replyMarkup) return null;
+  if (msg.replyMarkup instanceof Api.ReplyInlineMarkup) {
+    return msg.replyMarkup.rows.map(row =>
+      row.buttons.map(btn => ('text' in btn ? (btn as any).text as string : ''))
+    );
+  }
+  return null;
+}
+
+function resolveProxy(proxyId: string | null) {
+  if (!proxyId) return undefined;
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxies') as { value: string } | undefined;
+    if (!row?.value) return undefined;
+    const list: Array<{ id: string; url: string }> = JSON.parse(row.value);
+    return parseTgProxy(list.find(p => p.id === proxyId)?.url);
+  } catch { return undefined; }
+}
+
+function resolveDeviceParams(appClientId: string | null): TgDeviceParams | undefined {
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('tg_app_clients') as { value: string } | undefined;
+    if (!row?.value) return undefined;
+    const list: Array<{ id: string; isDefault?: boolean } & TgDeviceParams> = JSON.parse(row.value);
+    const c = appClientId ? list.find(x => x.id === appClientId) : list.find(x => x.isDefault);
+    if (!c) return undefined;
+    return {
+      deviceModel: c.deviceModel,
+      systemVersion: c.systemVersion,
+      appVersion: c.appVersion,
+      langCode: c.langCode,
+      langPack: c.langPack,
+      systemLangCode: c.systemLangCode,
+    };
+  } catch { return undefined; }
+}
+
+export async function getLiveClient(accountId: number): Promise<LiveEntry> {
+  let entry = liveClients.get(accountId);
+  if (entry) {
+    if (!entry.client.connected) await entry.client.connect();
+    return entry;
+  }
+
+  const account = db.prepare(
+    'SELECT api_id, api_hash, session_string, proxy_id, app_client_id FROM tg_accounts WHERE id = ?',
+  ).get(accountId) as AccountRow | undefined;
+
+  if (!account?.session_string) throw new Error('Account not found or not authenticated');
+
+  const proxy = resolveProxy(account.proxy_id);
+  const deviceParams = resolveDeviceParams(account.app_client_id);
+
+  const client = new TelegramClient(
+    new StringSession(account.session_string),
+    account.api_id,
+    account.api_hash,
+    {
+      connectionRetries: 5,
+      baseLogger: new Logger(LogLevel.NONE),
+      ...(proxy ? { proxy } : {}),
+      ...(deviceParams ?? {}),
+    },
+  );
+
+  await client.connect();
+
+  entry = { client, entityCache: new Map(), subscribers: new Set() };
+  liveClients.set(accountId, entry);
+
+  client.addEventHandler((event: NewMessageEvent) => {
+    const msg = event.message as Api.Message;
+    if (!msg?.peerId) return;
+
+    const chatId = peerToChatId(msg.peerId);
+    if (!chatId) return;
+
+    let fromName: string | null = null;
+    if (msg.fromId) {
+      const fid = peerToChatId(msg.fromId as Api.TypePeer);
+      const sender = entry!.entityCache.get(fid);
+      if (sender) fromName = entityName(sender);
+    }
+
+    const liveMsg: TgLiveMessage = {
+      chatId,
+      message: {
+        id: msg.id,
+        text: msg.message ?? '',
+        date: msg.date,
+        fromMe: Boolean(msg.out),
+        fromId: msg.fromId ? peerToChatId(msg.fromId as Api.TypePeer) : null,
+        fromName,
+        hasPhoto: msg.media instanceof Api.MessageMediaPhoto,
+        hasDocument: msg.media instanceof Api.MessageMediaDocument,
+        buttons: extractButtons(msg),
+      },
+    };
+
+    entry!.subscribers.forEach(sub => sub(liveMsg));
+  }, new NewMessage({}));
+
+  return entry;
+}
+
+// Load all dialogs into the entity cache
+export async function loadDialogs(entry: LiveEntry): Promise<TgDialogItem[]> {
+  const dialogs = await entry.client.getDialogs({ limit: 200 });
+  const result: TgDialogItem[] = [];
+
+  for (const d of dialogs) {
+    if (!d.entity) continue;
+    const entity = d.entity as Api.User | Api.Chat | Api.Channel;
+    const chatId = entityToChatId(entity);
+    entry.entityCache.set(chatId, entity);
+
+    const type: TgDialogItem['type'] =
+      entity instanceof Api.User
+        ? (entity.bot ? 'bot' : 'user')
+        : entity instanceof Api.Channel
+          ? (entity.megagroup ? 'group' : 'channel')
+          : 'group';
+
+    const lastMsg = d.message as Api.Message | undefined;
+    result.push({
+      chatId,
+      name: d.name ?? entityName(entity),
+      type,
+      username: (entity as any).username ?? null,
+      unreadCount: d.dialog.unreadCount ?? 0,
+      lastMessage: lastMsg
+        ? { text: lastMsg.message ?? '', date: lastMsg.date, fromMe: Boolean(lastMsg.out) }
+        : null,
+    });
+  }
+
+  return result;
+}
+
+export async function ensureEntityCached(entry: LiveEntry, chatId: string): Promise<void> {
+  if (entry.entityCache.has(chatId)) return;
+  await loadDialogs(entry);
+}
+
+export async function getMessages(
+  entry: LiveEntry,
+  chatId: string,
+  limit: number,
+  offsetId: number,
+): Promise<TgMsgPayload[]> {
+  await ensureEntityCached(entry, chatId);
+  const entity = entry.entityCache.get(chatId);
+  if (!entity) throw new Error('Chat not found -- open the dialogs list first');
+
+  const msgs = await entry.client.getMessages(entity, {
+    limit,
+    ...(offsetId ? { offsetId } : {}),
+  });
+
+  return msgs.map(msg => {
+    let fromName: string | null = null;
+    if (msg.fromId) {
+      const fid = peerToChatId(msg.fromId as Api.TypePeer);
+      const sender = entry.entityCache.get(fid);
+      if (sender) fromName = entityName(sender);
+    }
+    return {
+      id: msg.id,
+      text: msg.message ?? '',
+      date: msg.date,
+      fromMe: Boolean(msg.out),
+      fromId: msg.fromId ? peerToChatId(msg.fromId as Api.TypePeer) : null,
+      fromName,
+      hasPhoto: msg.media instanceof Api.MessageMediaPhoto,
+      hasDocument: msg.media instanceof Api.MessageMediaDocument,
+      buttons: extractButtons(msg as Api.Message),
+    };
+  });
+}
+
+export async function sendMessage(entry: LiveEntry, chatId: string, text: string): Promise<{ id: number; date: number }> {
+  await ensureEntityCached(entry, chatId);
+  const entity = entry.entityCache.get(chatId);
+  if (!entity) throw new Error('Chat not found');
+
+  const result = await entry.client.sendMessage(entity, { message: text });
+  return { id: result.id, date: result.date };
+}
+
+export async function getContacts(entry: LiveEntry): Promise<TgContactItem[]> {
+  const result = await entry.client.invoke(new Api.contacts.GetContacts({ hash: BigInt(0) as any }));
+  if (!('users' in result)) return [];
+
+  return (result.users as Api.User[])
+    .filter(u => !u.deleted)
+    .map(u => {
+      const chatId = entityToChatId(u);
+      entry.entityCache.set(chatId, u);
+      return {
+        chatId,
+        firstName: u.firstName ?? '',
+        lastName: u.lastName ?? '',
+        username: u.username ?? null,
+        phone: u.phone ?? null,
+      };
+    });
+}
+
+export async function addContact(entry: LiveEntry, phone: string, firstName: string, lastName = ''): Promise<TgContactItem | null> {
+  const result = await entry.client.invoke(new Api.contacts.ImportContacts({
+    contacts: [new Api.InputPhoneContact({
+      clientId: BigInt(Date.now() % 1_000_000) as any,
+      phone,
+      firstName,
+      lastName,
+    })],
+  }));
+
+  const user = (result.users as Api.User[])[0];
+  if (!user) return null;
+
+  const chatId = entityToChatId(user);
+  entry.entityCache.set(chatId, user);
+  return {
+    chatId,
+    firstName: user.firstName ?? '',
+    lastName: user.lastName ?? '',
+    username: user.username ?? null,
+    phone: user.phone ?? null,
+  };
+}
+
+export async function searchPeers(entry: LiveEntry, query: string): Promise<TgDialogItem[]> {
+  const result = await entry.client.invoke(new Api.contacts.Search({ q: query, limit: 20 }));
+
+  const items: TgDialogItem[] = [];
+
+  for (const u of result.users as Api.User[]) {
+    if (u.deleted) continue;
+    const chatId = entityToChatId(u);
+    entry.entityCache.set(chatId, u);
+    items.push({
+      chatId,
+      name: entityName(u),
+      type: u.bot ? 'bot' : 'user',
+      username: u.username ?? null,
+      unreadCount: 0,
+      lastMessage: null,
+    });
+  }
+
+  for (const c of result.chats as (Api.Chat | Api.Channel)[]) {
+    if ((c as any).deactivated || (c as any).forbidden) continue;
+    const chatId = entityToChatId(c as Api.Chat | Api.Channel);
+    entry.entityCache.set(chatId, c as Api.Chat | Api.Channel);
+    items.push({
+      chatId,
+      name: entityName(c as Api.Chat | Api.Channel),
+      type: c instanceof Api.Channel ? (c.megagroup ? 'group' : 'channel') : 'group',
+      username: (c as any).username ?? null,
+      unreadCount: 0,
+      lastMessage: null,
+    });
+  }
+
+  return items;
+}
+
+export async function fetchPhoto(entry: LiveEntry, chatId: string, msgId: number): Promise<Buffer | null> {
+  await ensureEntityCached(entry, chatId);
+  const entity = entry.entityCache.get(chatId);
+  if (!entity) return null;
+
+  const [msg] = await entry.client.getMessages(entity, { ids: [msgId] });
+  if (!msg?.media) return null;
+
+  const data = await entry.client.downloadMedia(msg, {});
+  if (!data) return null;
+  if (Buffer.isBuffer(data)) return data;
+  if (typeof data === 'string') return Buffer.from(data, 'binary');
+  return Buffer.from(data as Uint8Array);
+}
+
+export type TgFolderItem = {
+  id: number;
+  title: string;
+  emoticon: string | null;
+  includeGroups: boolean;
+  includeBroadcasts: boolean;
+  includeBots: boolean;
+  includeContacts: boolean;
+  includeNonContacts: boolean;
+  pinnedChatIds: string[];
+  includedChatIds: string[];
+  excludedChatIds: string[];
+};
+
+// Convert an InputPeer (from DialogFilter peer lists) to chatId format
+function inputPeerToChatId(peer: any): string {
+  if (!peer) return '';
+  if (peer.userId !== undefined) return `u${peer.userId}`;
+  if (peer.channelId !== undefined) return `c${peer.channelId}`;
+  if (peer.chatId !== undefined) return `g${peer.chatId}`;
+  return '';
+}
+
+export async function getFolders(entry: LiveEntry): Promise<TgFolderItem[]> {
+  try {
+    const raw = await entry.client.invoke(new Api.messages.GetDialogFilters());
+    // Older layers return a plain array; newer layers wrap in { filters: [...] }
+    const filters: any[] = Array.isArray(raw) ? raw : ((raw as any)?.filters ?? []);
+
+    return filters
+      .filter((f: any) => f.id && f.title !== undefined)
+      .map((f: any) => ({
+        id: f.id as number,
+        title: typeof f.title === 'string' ? f.title : (f.title?.text ?? 'Folder'),
+        emoticon: (f.emoticon as string | undefined) ?? null,
+        includeGroups:    Boolean(f.groups),
+        includeBroadcasts: Boolean(f.broadcasts),
+        includeBots:      Boolean(f.bots),
+        includeContacts:  Boolean(f.contacts),
+        includeNonContacts: Boolean(f.nonContacts),
+        pinnedChatIds:   ((f.pinnedPeers  ?? []) as any[]).map(inputPeerToChatId).filter(Boolean),
+        includedChatIds: ((f.includePeers ?? []) as any[]).map(inputPeerToChatId).filter(Boolean),
+        excludedChatIds: ((f.excludePeers ?? []) as any[]).map(inputPeerToChatId).filter(Boolean),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export function subscribeToMessages(accountId: number, handler: (msg: TgLiveMessage) => void): () => void {
+  const entry = liveClients.get(accountId);
+  if (!entry) return () => {};
+  entry.subscribers.add(handler);
+  return () => entry.subscribers.delete(handler);
+}

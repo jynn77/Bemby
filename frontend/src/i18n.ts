@@ -10,6 +10,7 @@ const zh = {
     settings: "设置",
     logs: "日志",
     help: "帮助",
+    messenger: "消息",
     logout: "退出登录",
   },
   common: {
@@ -442,6 +443,7 @@ const en: typeof zh = {
     settings: "Settings",
     logs: "Logs",
     help: "Help",
+    messenger: "Messenger",
     logout: "Logout",
   },
   common: {

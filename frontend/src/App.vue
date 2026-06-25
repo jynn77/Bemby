@@ -37,6 +37,7 @@
       <a class="nav-link" href="#" :class="{ active: currentView === 'settings' }" @click.prevent="setView('settings')">{{ t('nav.settings') }}</a>
       <a class="nav-link" href="#" :class="{ active: currentView === 'logs' }" @click.prevent="setView('logs')">{{ t('nav.logs') }}</a>
       <a class="nav-link" href="#" :class="{ active: currentView === 'help' }" @click.prevent="setView('help')">{{ t('nav.help') }}</a>
+      <a class="nav-link" href="#" @click.prevent="showMessenger = true">{{ t('nav.messenger') }}</a>
       <div class="sidebar-footer">
         <div class="lang-switcher">
           <button class="lang-btn" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">
@@ -57,10 +58,13 @@
       <component :is="currentComponent" />
     </main>
   </div>
+
+  <TgClientPopup v-if="showMessenger" @close="showMessenger = false" />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, type Component } from 'vue';
+import TgClientPopup from './components/TgClientPopup.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { version as APP_VERSION } from '../package.json';
 import { t, locale, setLocale } from './i18n';
@@ -94,6 +98,8 @@ function setView(view: ViewName) {
   localStorage.setItem(LAST_VIEW_KEY, view);
   sidebarOpen.value = false;
 }
+
+const showMessenger = ref(false);
 
 const route = useRoute();
 const router = useRouter();
