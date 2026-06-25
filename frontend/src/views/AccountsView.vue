@@ -2,7 +2,18 @@
   <div>
     <div class="page-header">
       <h2 class="page-title">{{ t('accounts.title') }}</h2>
-      <button class="btn btn-primary" @click="openAdd"><i class="fa-solid fa-plus"></i> {{ t('accounts.addBtn') }}</button>
+      <div class="page-header-actions">
+        <button v-if="selectedIds.size > 0" class="btn btn-secondary" @click="openExportWarn">
+          <i class="fa-solid fa-file-export"></i> {{ t('accounts.exportSelectedBtn') }} ({{ selectedIds.size }})
+        </button>
+        <button v-else class="btn btn-secondary" @click="openExportWarn">
+          <i class="fa-solid fa-file-export"></i> {{ t('accounts.exportBtn') }}
+        </button>
+        <button class="btn btn-secondary" @click="openImport">
+          <i class="fa-solid fa-file-import"></i> {{ t('accounts.importBtn') }}
+        </button>
+        <button class="btn btn-primary" @click="openAdd"><i class="fa-solid fa-plus"></i> {{ t('accounts.addBtn') }}</button>
+      </div>
     </div>
 
     <div class="card">
@@ -10,6 +21,9 @@
         <table>
           <thead>
             <tr>
+              <th style="width:36px">
+                <input type="checkbox" :checked="allSelected" :indeterminate="someSelected" @change="toggleSelectAll" />
+              </th>
               <th>{{ t('common.name') }}</th>
               <th>{{ t('accounts.colPhone') }}</th>
               <th>{{ t('accounts.colStatus') }}</th>
@@ -19,9 +33,10 @@
           </thead>
           <tbody>
             <tr v-if="!accounts.length">
-              <td colspan="5" class="empty">{{ t('accounts.noAccounts') }}</td>
+              <td colspan="6" class="empty">{{ t('accounts.noAccounts') }}</td>
             </tr>
             <tr v-for="a in accounts" :key="a.id" :class="a.disabled ? 'row-disabled' : ''">
+              <td><input type="checkbox" :checked="selectedIds.has(a.id)" @change="toggleSelect(a.id)" /></td>
               <td>
                 {{ a.name }}
                 <span v-if="a.disabled" class="badge badge-grey" style="margin-left:6px;font-size:10px">{{ t('accounts.disabled') }}</span>
@@ -56,6 +71,44 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Export warning modal -->
+    <div v-if="showExportWarn" class="modal-backdrop">
+      <div class="modal" style="max-width:460px">
+        <h3 class="modal-title"><i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-right:8px"></i>{{ t('accounts.exportWarnTitle') }}</h3>
+        <div class="warn-box">{{ t('accounts.exportWarnBody') }}</div>
+        <p style="font-size:13px;color:#555;margin-top:12px">
+          {{ selectedIds.size > 0
+            ? (locale === 'zh' ? `将导出 ${selectedIds.size} 个账户` : `Exporting ${selectedIds.size} account(s)`)
+            : (locale === 'zh' ? `将导出全部 ${accounts.length} 个账户` : `Exporting all ${accounts.length} account(s)`) }}
+        </p>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showExportWarn = false"><i class="fa-solid fa-xmark"></i> {{ t('common.cancel') }}</button>
+          <button class="btn btn-primary" @click="confirmExport"><i class="fa-solid fa-download"></i> {{ t('common.download') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import modal -->
+    <div v-if="showImport" class="modal-backdrop">
+      <div class="modal" style="max-width:480px">
+        <h3 class="modal-title">{{ t('accounts.importTitle') }}</h3>
+        <div class="warn-box">{{ t('accounts.importWarnBody') }}</div>
+        <div class="form-group" style="margin-top:16px">
+          <label class="form-label">{{ t('accounts.importFileLabel') }}</label>
+          <input ref="importFileEl" type="file" accept=".json,application/json" class="form-input" @change="onImportFile" />
+        </div>
+        <div v-if="importError" class="error-msg">{{ importError }}</div>
+        <div v-if="importResult" class="success-msg">{{ importResult }}</div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showImport = false"><i class="fa-solid fa-xmark"></i> {{ t('common.cancel') }}</button>
+          <button class="btn btn-primary" :disabled="!importReady || importBusy" @click="doImport">
+            <i class="fa-solid fa-file-import"></i>
+            {{ importBusy ? t('accounts.importDoing') : t('accounts.importBtn') }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -199,7 +252,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { accountsApi, settingsApi, type Account, type Proxy, type TgAppClient, type TgAccountStatus } from '../api/client';
+import { accountsApi, settingsApi, type Account, type Proxy, type TgAppClient, type TgAccountStatus, type AccountExportItem } from '../api/client';
 import { t, locale } from '../i18n';
 
 const accounts = ref<Account[]>([]);
@@ -228,6 +281,103 @@ const statusTarget = ref<Account | null>(null);
 const statusResult = ref<TgAccountStatus | null>(null);
 const statusError = ref('');
 const statusChecking = ref(false);
+
+// ── Selection state ───────────────────────────────────────────────────────────
+const selectedIds = ref(new Set<number>());
+const allSelected = computed(() => accounts.value.length > 0 && accounts.value.every(a => selectedIds.value.has(a.id)));
+const someSelected = computed(() => accounts.value.some(a => selectedIds.value.has(a.id)) && !allSelected.value);
+
+function toggleSelectAll() {
+  if (allSelected.value) {
+    selectedIds.value = new Set();
+  } else {
+    selectedIds.value = new Set(accounts.value.map(a => a.id));
+  }
+}
+
+function toggleSelect(id: number) {
+  const next = new Set(selectedIds.value);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  selectedIds.value = next;
+}
+
+// ── Export state ──────────────────────────────────────────────────────────────
+const showExportWarn = ref(false);
+
+function openExportWarn() {
+  showExportWarn.value = true;
+}
+
+async function confirmExport() {
+  showExportWarn.value = false;
+  const ids = selectedIds.value.size > 0 ? [...selectedIds.value] : undefined;
+  const payload = await accountsApi.export(ids);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bemby-accounts-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Import state ──────────────────────────────────────────────────────────────
+const showImport = ref(false);
+const importFileEl = ref<HTMLInputElement | null>(null);
+const importParsed = ref<AccountExportItem[] | null>(null);
+const importReady = computed(() => importParsed.value !== null);
+const importBusy = ref(false);
+const importError = ref('');
+const importResult = ref('');
+
+function openImport() {
+  importParsed.value = null;
+  importError.value = '';
+  importResult.value = '';
+  importBusy.value = false;
+  showImport.value = true;
+}
+
+function onImportFile(e: Event) {
+  importError.value = '';
+  importResult.value = '';
+  importParsed.value = null;
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const raw = JSON.parse(reader.result as string);
+      // Accept both a full export payload and a bare array
+      const items: unknown = Array.isArray(raw) ? raw : raw?.accounts;
+      if (!Array.isArray(items)) throw new Error('No accounts array found');
+      importParsed.value = items as AccountExportItem[];
+    } catch {
+      importError.value = t('accounts.importFailed') + ': invalid JSON format';
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function doImport() {
+  if (!importParsed.value) return;
+  importBusy.value = true;
+  importError.value = '';
+  importResult.value = '';
+  try {
+    const { imported, skipped } = await accountsApi.import(importParsed.value);
+    importResult.value = locale.value === 'zh'
+      ? `导入完成：${imported} 个成功，${skipped} 个跳过（手机号已存在）`
+      : `Done: ${imported} imported, ${skipped} skipped (phone already exists)`;
+    importParsed.value = null;
+    if (importFileEl.value) importFileEl.value.value = '';
+    await load();
+  } catch (err: any) {
+    importError.value = t('accounts.importFailed') + ': ' + (err.response?.data?.error ?? err.message);
+  } finally {
+    importBusy.value = false;
+  }
+}
 
 // ── Auth state ────────────────────────────────────────────────────────────────
 const showAuth = ref(false);
@@ -401,6 +551,23 @@ async function verify2fa() {
 </script>
 
 <style scoped>
+.page-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.warn-box {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #92400e;
+  line-height: 1.5;
+}
+
 .row-disabled td {
   opacity: 0.5;
 }

@@ -84,6 +84,76 @@ router.post('/', (req, res) => {
   res.status(201).json(toJson(row));
 });
 
+type AccountImportItem = {
+  name?: string;
+  phoneNumber: string;
+  apiId: number;
+  apiHash: string;
+  sessionString?: string | null;
+  authStatus?: string;
+  proxyId?: string | null;
+  appClientId?: string | null;
+  disabled?: boolean;
+};
+
+// POST /export -- export selected (or all) accounts with sensitive fields
+router.post('/export', (req, res) => {
+  const { ids } = req.body as { ids?: number[] };
+  let rows: AccountRow[];
+  if (Array.isArray(ids) && ids.length) {
+    const placeholders = ids.map(() => '?').join(',');
+    rows = db.prepare(`SELECT * FROM tg_accounts WHERE id IN (${placeholders}) ORDER BY id`).all(...ids) as AccountRow[];
+  } else {
+    rows = db.prepare('SELECT * FROM tg_accounts ORDER BY id').all() as AccountRow[];
+  }
+  res.json({
+    version: '1',
+    exportedAt: new Date().toISOString(),
+    accounts: rows.map(a => ({
+      name: a.name,
+      phoneNumber: a.phone_number,
+      apiId: a.api_id,
+      apiHash: a.api_hash,
+      sessionString: a.session_string,
+      authStatus: a.auth_status,
+      proxyId: a.proxy_id ?? null,
+      appClientId: a.app_client_id ?? null,
+      disabled: Boolean(a.disabled),
+    })),
+  });
+});
+
+// POST /import -- import accounts; skips existing by phone number
+router.post('/import', (req, res) => {
+  const { accounts: items } = req.body as { accounts?: AccountImportItem[] };
+  if (!Array.isArray(items)) {
+    res.status(400).json({ error: 'accounts array required' });
+    return;
+  }
+  let imported = 0;
+  let skipped = 0;
+  for (const a of items) {
+    if (!a.phoneNumber || !a.apiId || !a.apiHash) { skipped++; continue; }
+    const existing = db.prepare('SELECT id FROM tg_accounts WHERE phone_number = ?').get(a.phoneNumber) as { id: number } | undefined;
+    if (existing) { skipped++; continue; }
+    db.prepare(
+      'INSERT INTO tg_accounts (name, phone_number, api_id, api_hash, session_string, auth_status, proxy_id, app_client_id, disabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(
+      a.name || a.phoneNumber,
+      a.phoneNumber,
+      Number(a.apiId),
+      a.apiHash,
+      a.sessionString ?? null,
+      a.authStatus ?? 'unauthenticated',
+      a.proxyId ?? null,
+      a.appClientId ?? null,
+      a.disabled ? 1 : 0,
+    );
+    imported++;
+  }
+  res.json({ imported, skipped });
+});
+
 router.put('/:id', (req, res) => {
   const { name, phoneNumber, apiId, apiHash, proxyId, disabled, appClientId } = req.body as Record<string, string | null | boolean>;
   const existing = db.prepare('SELECT * FROM tg_accounts WHERE id = ?').get(req.params.id) as AccountRow | undefined;

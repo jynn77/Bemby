@@ -53,6 +53,24 @@ export type Account = {
   createdAt: string;
 };
 
+export type AccountExportItem = {
+  name: string;
+  phoneNumber: string;
+  apiId: number;
+  apiHash: string;
+  sessionString: string | null;
+  authStatus: string;
+  proxyId: string | null;
+  appClientId: string | null;
+  disabled: boolean;
+};
+
+export type AccountExportPayload = {
+  version: "1";
+  exportedAt: string;
+  accounts: AccountExportItem[];
+};
+
 export type TgAccountStatus = {
   isActive: boolean;
   isDeleted: boolean;
@@ -297,6 +315,16 @@ export const accountsApi = {
   checkStatus: (id: number) =>
     api
       .post<TgAccountStatus>(`/accounts/${id}/check-status`)
+      .then((r) => r.data),
+  export: (ids?: number[]) =>
+    api
+      .post<AccountExportPayload>("/accounts/export", { ids: ids ?? [] })
+      .then((r) => r.data),
+  import: (accounts: AccountExportItem[]) =>
+    api
+      .post<{ imported: number; skipped: number }>("/accounts/import", {
+        accounts,
+      })
       .then((r) => r.data),
 };
 
