@@ -291,6 +291,14 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function safeHref(url: string): string {
+  try {
+    return /^(https?|tg):$/i.test(new URL(url).protocol) ? url : '';
+  } catch {
+    return '';
+  }
+}
+
 function messageToHtml(text: string, entities?: Api.TypeMessageEntity[]): string {
   if (!entities?.length) return escapeHtml(text).replace(/\n/g, '<br>');
 
@@ -318,13 +326,17 @@ function messageToHtml(text: string, entities?: Api.TypeMessageEntity[]): string
       ins.push({ pos: e.offset, html: '<s>', isClose: false });
       ins.push({ pos: end, html: '</s>', isClose: true });
     } else if (e instanceof Api.MessageEntityUrl) {
-      const url = escapeHtml(text.slice(e.offset, end));
-      ins.push({ pos: e.offset, html: `<a href="${url}" target="_blank" rel="noopener">`, isClose: false });
-      ins.push({ pos: end, html: '</a>', isClose: true });
+      const safe = safeHref(text.slice(e.offset, end));
+      if (safe) {
+        ins.push({ pos: e.offset, html: `<a href="${escapeHtml(safe)}" target="_blank" rel="noopener">`, isClose: false });
+        ins.push({ pos: end, html: '</a>', isClose: true });
+      }
     } else if (e instanceof Api.MessageEntityTextUrl) {
-      const url = escapeHtml((e as Api.MessageEntityTextUrl).url ?? '');
-      ins.push({ pos: e.offset, html: `<a href="${url}" target="_blank" rel="noopener">`, isClose: false });
-      ins.push({ pos: end, html: '</a>', isClose: true });
+      const safe = safeHref((e as Api.MessageEntityTextUrl).url ?? '');
+      if (safe) {
+        ins.push({ pos: e.offset, html: `<a href="${escapeHtml(safe)}" target="_blank" rel="noopener">`, isClose: false });
+        ins.push({ pos: end, html: '</a>', isClose: true });
+      }
     } else if (e instanceof Api.MessageEntityBotCommand) {
       ins.push({ pos: e.offset, html: '<span style="color:#2563eb">', isClose: false });
       ins.push({ pos: end, html: '</span>', isClose: true });

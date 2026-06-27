@@ -101,6 +101,15 @@ function escHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Only allow http/https/tg URLs in href attributes -- strips anything else.
+function safeHref(url: string): string {
+  try {
+    return /^(https?|tg):$/i.test(new URL(url).protocol) ? url : "";
+  } catch {
+    return "";
+  }
+}
+
 // Converts Telegram message entities to safe HTML. Returns null when there are
 // no formatting entities (plain text can be rendered directly).
 function entitiesToHtml(
@@ -115,20 +124,26 @@ function entitiesToHtml(
   for (const e of entities) {
     const end = e.offset + e.length;
     if (e instanceof Api.MessageEntityTextUrl) {
-      spans.push({
-        offset: e.offset,
-        end,
-        open: `<a href="${escHtml(e.url)}" class="tgc-link" data-tgurl>`,
-        close: "</a>",
-      });
+      const safe = safeHref(e.url ?? "");
+      if (safe) {
+        spans.push({
+          offset: e.offset,
+          end,
+          open: `<a href="${escHtml(safe)}" class="tgc-link" data-tgurl>`,
+          close: "</a>",
+        });
+      }
     } else if (e instanceof Api.MessageEntityUrl) {
       const url = text.slice(e.offset, end);
-      spans.push({
-        offset: e.offset,
-        end,
-        open: `<a href="${escHtml(url)}" class="tgc-link" data-tgurl>`,
-        close: "</a>",
-      });
+      const safe = safeHref(url);
+      if (safe) {
+        spans.push({
+          offset: e.offset,
+          end,
+          open: `<a href="${escHtml(safe)}" class="tgc-link" data-tgurl>`,
+          close: "</a>",
+        });
+      }
     } else if (e instanceof Api.MessageEntityMention) {
       const handle = text.slice(e.offset + 1, end); // strip leading @
       spans.push({
