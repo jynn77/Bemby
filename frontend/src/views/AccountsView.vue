@@ -39,6 +39,7 @@
               </th>
               <th>{{ t("common.name") }}</th>
               <th>{{ t("accounts.colPhone") }}</th>
+              <th class="col-hide-mobile">{{ t("accounts.colTgName") }}</th>
               <th>{{ t("accounts.colStatus") }}</th>
               <th class="col-hide-mobile">{{ t("accounts.colAdded") }}</th>
               <th>{{ t("common.actions") }}</th>
@@ -46,7 +47,7 @@
           </thead>
           <tbody>
             <tr v-if="!accounts.length">
-              <td colspan="7" class="empty">{{ t("accounts.noAccounts") }}</td>
+              <td colspan="8" class="empty">{{ t("accounts.noAccounts") }}</td>
             </tr>
             <tr
               v-for="(a, idx) in accounts"
@@ -103,14 +104,33 @@
                 >
               </td>
               <td>{{ a.phoneNumber }}</td>
+              <td class="tg-name-cell col-hide-mobile">
+                <span v-if="metaLoading.has(a.id)" class="tg-name-loading">
+                  <span class="spinner-xs"></span>
+                </span>
+                <template v-else-if="a.tgDisplayName">
+                  <span class="tg-name-text">{{ a.tgDisplayName }}</span>
+                  <span v-if="a.tgUsername" class="tg-name-username">@{{ a.tgUsername }}</span>
+                </template>
+                <button
+                  v-if="a.authStatus === 'authenticated'"
+                  class="btn btn-xs btn-ghost btn-icon tg-name-refresh"
+                  :disabled="metaLoading.has(a.id)"
+                  title="Refresh TG name"
+                  @click="fetchMeta(a.id)"
+                >
+                  <i class="fa-solid fa-arrows-rotate"></i>
+                </button>
+              </td>
               <td>
                 <span :class="statusBadge(a.authStatus)">{{
                   t(`accounts.status.${a.authStatus}`)
                 }}</span>
               </td>
               <td class="col-hide-mobile">{{ fmtDate(a.createdAt) }}</td>
-              <td>
-                <div class="actions">
+              <td @click.stop>
+                <!-- desktop: icon buttons -->
+                <div class="actions hide-mobile">
                   <button
                     v-if="a.authStatus !== 'authenticated'"
                     class="btn btn-sm btn-primary btn-icon"
@@ -129,20 +149,10 @@
                   </button>
                   <button
                     class="btn btn-sm btn-ghost btn-icon"
-                    :title="
-                      a.disabled
-                        ? t('accounts.enableAccount')
-                        : t('accounts.disableAccount')
-                    "
+                    :title="a.disabled ? t('accounts.enableAccount') : t('accounts.disableAccount')"
                     @click="toggleDisabled(a)"
                   >
-                    <i
-                      :class="
-                        a.disabled
-                          ? 'fa-solid fa-circle-play'
-                          : 'fa-solid fa-ban'
-                      "
-                    ></i>
+                    <i :class="a.disabled ? 'fa-solid fa-circle-play' : 'fa-solid fa-ban'"></i>
                   </button>
                   <button
                     class="btn btn-sm btn-ghost btn-icon"
@@ -159,6 +169,10 @@
                     <i class="fa-solid fa-trash"></i>
                   </button>
                 </div>
+                <!-- mobile: ... opens action sheet -->
+                <button class="btn btn-sm btn-ghost btn-icon show-mobile" @click="actionMenuAccount = a">
+                  <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
               </td>
             </tr>
           </tbody>
@@ -509,6 +523,58 @@
         </div>
       </div>
     </div>
+
+    <!-- Mobile action sheet -->
+    <div v-if="actionMenuAccount" class="action-sheet-backdrop" @click="actionMenuAccount = null">
+      <div class="action-sheet" @click.stop>
+        <div class="action-sheet-header">{{ actionMenuAccount.name }}</div>
+        <button
+          v-if="actionMenuAccount.authStatus !== 'authenticated'"
+          class="action-sheet-btn"
+          @click="openAuth(actionMenuAccount); actionMenuAccount = null"
+        >
+          <i class="fa-solid fa-key"></i> {{ t("accounts.authenticate") }}
+        </button>
+        <button
+          v-if="actionMenuAccount.authStatus === 'authenticated'"
+          class="action-sheet-btn"
+          @click="openCheckStatus(actionMenuAccount); actionMenuAccount = null"
+        >
+          <i class="fa-solid fa-circle-info"></i> {{ t("accounts.checkStatus") }}
+        </button>
+        <button
+          v-if="actionMenuAccount.authStatus === 'authenticated'"
+          class="action-sheet-btn"
+          :disabled="metaLoading.has(actionMenuAccount.id)"
+          @click="fetchMeta(actionMenuAccount.id); actionMenuAccount = null"
+        >
+          <i class="fa-solid fa-arrows-rotate"></i> {{ t("accounts.colTgName") }}
+        </button>
+        <button
+          class="action-sheet-btn"
+          @click="toggleDisabled(actionMenuAccount); actionMenuAccount = null"
+        >
+          <i :class="actionMenuAccount.disabled ? 'fa-solid fa-circle-play' : 'fa-solid fa-ban'"></i>
+          {{ actionMenuAccount.disabled ? t("accounts.enableAccount") : t("accounts.disableAccount") }}
+        </button>
+        <button
+          class="action-sheet-btn"
+          @click="openEdit(actionMenuAccount); actionMenuAccount = null"
+        >
+          <i class="fa-solid fa-pen"></i> {{ t("common.edit") }}
+        </button>
+        <button
+          class="action-sheet-btn danger"
+          @click="remove(actionMenuAccount.id); actionMenuAccount = null"
+        >
+          <i class="fa-solid fa-trash"></i> {{ t("common.delete") }}
+        </button>
+        <div class="action-sheet-divider"></div>
+        <button class="action-sheet-btn action-sheet-cancel" @click="actionMenuAccount = null">
+          {{ t("common.cancel") }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -591,6 +657,25 @@ const form = reactive({
 });
 const formError = ref("");
 const saving = ref(false);
+
+// ── TG meta refresh (display name + username stored in DB, loaded with accounts list) ──
+const metaLoading = reactive(new Set<number>());
+
+async function fetchMeta(accountId: number) {
+  if (metaLoading.has(accountId)) return;
+  metaLoading.add(accountId);
+  try {
+    const meta = await accountsApi.refreshTgMeta(accountId);
+    const idx = accounts.value.findIndex((a) => a.id === accountId);
+    if (idx !== -1) {
+      accounts.value[idx] = { ...accounts.value[idx], ...meta };
+    }
+  } catch {}
+  finally { metaLoading.delete(accountId); }
+}
+
+// ── Mobile action sheet ───────────────────────────────────────────────────────
+const actionMenuAccount = ref<Account | null>(null);
 
 // ── Status check state ────────────────────────────────────────────────────────
 const showStatus = ref(false);
@@ -731,6 +816,12 @@ onMounted(async () => {
     if (expired.length > 0) await load();
   } catch {
     // Background check failure is non-critical
+  }
+  // Auto-fetch TG name for authenticated accounts that have none stored yet.
+  for (const a of accounts.value) {
+    if (a.authStatus === "authenticated" && !a.tgDisplayName) {
+      fetchMeta(a.id); // fire-and-forget, shows spinner in cell
+    }
   }
 });
 
@@ -957,6 +1048,65 @@ async function verify2fa() {
 </script>
 
 <style scoped>
+.tg-name-cell {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tg-name-text {
+  font-size: 13px;
+}
+
+.tg-name-username {
+  font-size: 11px;
+  color: #888;
+}
+
+.tg-name-loading {
+  display: flex;
+  align-items: center;
+}
+
+.tg-name-refresh {
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+tr:hover .tg-name-refresh {
+  opacity: 1;
+}
+
+@media (max-width: 767px) {
+  .tg-name-cell {
+    display: none;
+  }
+}
+
+.btn-xs {
+  padding: 2px 6px;
+  font-size: 11px;
+  height: 22px;
+}
+
+/* Minimal inline spinner */
+.spinner-xs {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .page-header-actions {
   display: flex;
   gap: 8px;
@@ -1027,5 +1177,66 @@ tr[draggable] {
 
 tr.drag-over td {
   background: #eef2ff;
+}
+
+.action-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+}
+
+.action-sheet {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.action-sheet-header {
+  padding: 14px 20px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.action-sheet-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 15px 20px;
+  background: none;
+  border: none;
+  font-size: 15px;
+  color: #1a1a2e;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.action-sheet-btn:not(:disabled):active {
+  background: #f5f5f5;
+}
+
+.action-sheet-btn.danger {
+  color: #e63946;
+}
+
+.action-sheet-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-sheet-divider {
+  height: 1px;
+  background: #f0f0f0;
+  margin: 4px 0;
 }
 </style>

@@ -53,6 +53,8 @@ export type Account = {
   appClientId: string | null;
   createdAt: string;
   sortOrder: number;
+  tgDisplayName: string | null;
+  tgUsername: string | null;
 };
 
 export type AccountExportItem = {
@@ -299,7 +301,7 @@ export const accountsApi = {
   create: (
     data: Omit<
       Account,
-      "id" | "authStatus" | "createdAt" | "disabled" | "sortOrder"
+      "id" | "authStatus" | "createdAt" | "disabled" | "sortOrder" | "tgDisplayName" | "tgUsername"
     > & {
       apiHash: string;
     },
@@ -325,6 +327,10 @@ export const accountsApi = {
   checkStatus: (id: number) =>
     api
       .post<TgAccountStatus>(`/accounts/${id}/check-status`)
+      .then((r) => r.data),
+  refreshTgMeta: (id: number) =>
+    api
+      .post<{ tgDisplayName: string | null; tgUsername: string | null }>(`/accounts/${id}/refresh-tg-meta`)
       .then((r) => r.data),
   export: (ids?: number[]) =>
     api
@@ -571,6 +577,7 @@ export type TgDialog = {
   username: string | null;
   unreadCount: number;
   lastMessage: { text: string; date: number; fromMe: boolean } | null;
+  left?: boolean; // not a member; join required to send messages
 };
 
 export type TgButton = {
@@ -663,7 +670,7 @@ export const tgClientApi = {
   messages: (
     accountId: number,
     chatId: string,
-    params?: { limit?: number; offsetId?: number },
+    params?: { limit?: number; offsetId?: number; fresh?: 1 },
     signal?: AbortSignal,
   ) =>
     api
@@ -727,6 +734,13 @@ export const tgClientApi = {
     return `/api/tg-client/${accountId}/avatar/${encodeURIComponent(chatId)}?token=${encodeURIComponent(token)}`;
   },
 
+  avatarsBatch: (accountId: number, chatIds: string[]) =>
+    api
+      .get<
+        Record<string, string>
+      >(`/tg-client/${accountId}/avatars?ids=${chatIds.map(encodeURIComponent).join(",")}`)
+      .then((r) => r.data),
+
   profile: (accountId: number, chatId: string) =>
     api
       .get<TgProfile>(
@@ -767,6 +781,11 @@ export const tgClientApi = {
         `/tg-client/${accountId}/messages/${encodeURIComponent(chatId)}/${msgId}/button`,
         { data },
       )
+      .then((r) => r.data),
+
+  clearCache: (accountId: number, chatId: string) =>
+    api
+      .delete(`/tg-client/${accountId}/messages/${encodeURIComponent(chatId)}/cache`)
       .then((r) => r.data),
 
   sendReaction: (
@@ -830,6 +849,42 @@ export const tgClientApi = {
       .post<TgDialog>(
         `/tg-client/${accountId}/invite/${encodeURIComponent(hash)}`,
       )
+      .then((r) => r.data),
+
+  join: (accountId: number, chatId: string) =>
+    api
+      .post<{
+        ok: boolean;
+        joined?: boolean;
+        requestSent?: boolean;
+      }>(`/tg-client/${accountId}/join/${encodeURIComponent(chatId)}`)
+      .then((r) => r.data),
+
+  membership: (accountId: number, chatId: string) =>
+    api
+      .get<{
+        member: boolean;
+      }>(`/tg-client/${accountId}/membership/${encodeURIComponent(chatId)}`)
+      .then((r) => r.data),
+
+  pinnedMessage: (accountId: number, chatId: string) =>
+    api
+      .get<TgMessage | null>(`/tg-client/${accountId}/chats/${encodeURIComponent(chatId)}/pinned`)
+      .then((r) => r.data),
+
+  startBot: (accountId: number, username: string, startParam: string) =>
+    api
+      .post<TgDialog>(`/tg-client/${accountId}/start-bot/${encodeURIComponent(username)}`, {
+        startParam,
+      })
+      .then((r) => r.data),
+
+  webviewResolve: (accountId: number, url: string, botChatId?: string | null) =>
+    api
+      .post<{ webAppUrl: string }>(`/tg-client/${accountId}/webview/resolve`, {
+        url,
+        botChatId,
+      })
       .then((r) => r.data),
 };
 

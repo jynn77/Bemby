@@ -43,6 +43,8 @@ type AccountRow = {
   app_client_id: string | null;
   created_at: string;
   sort_order: number;
+  tg_display_name: string | null;
+  tg_username: string | null;
 };
 
 function resolveAppClientParams(
@@ -113,7 +115,16 @@ function toJson(row: AccountRow) {
     appClientId: row.app_client_id ?? null,
     createdAt: row.created_at,
     sortOrder: row.sort_order ?? 0,
+    tgDisplayName: row.tg_display_name ?? null,
+    tgUsername: row.tg_username ?? null,
   };
+}
+
+function saveTgMeta(id: number, firstName: string, lastName: string | undefined, username: string | undefined) {
+  const displayName = [firstName, lastName].filter(Boolean).join(" ");
+  db.prepare(
+    "UPDATE tg_accounts SET tg_display_name = ?, tg_username = ? WHERE id = ?",
+  ).run(displayName || null, username || null, id);
 }
 
 router.get("/", (req, res) => {
@@ -329,7 +340,39 @@ router.post("/:id/check-status", async (req, res) => {
       deviceParams,
     );
     if (statusNeedsReauth(status)) markSessionExpired(account.id);
+    saveTgMeta(account.id, status.firstName, status.lastName, status.username);
     res.json(status);
+  } catch (err: any) {
+    if (isAuthError(err?.message ?? "")) markSessionExpired(account.id);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /:id/refresh-tg-meta -- fetch TG display name and persist it; returns { tgDisplayName, tgUsername }
+router.post("/:id/refresh-tg-meta", async (req, res) => {
+  const account = db
+    .prepare("SELECT * FROM tg_accounts WHERE id = ?")
+    .get(req.params.id) as AccountRow | undefined;
+  if (!account) { res.status(404).json({ error: "Not found" }); return; }
+  if (!account.session_string) {
+    res.status(400).json({ error: "Account not authenticated" });
+    return;
+  }
+  try {
+    const proxyUrl = resolveProxyUrl(account.proxy_id);
+    const proxy = parseTgProxy(proxyUrl);
+    const deviceParams = resolveAppClientParams(account.app_client_id);
+    const status = await checkAccountStatus(
+      account.api_id,
+      account.api_hash,
+      account.session_string,
+      proxy,
+      deviceParams,
+    );
+    if (statusNeedsReauth(status)) markSessionExpired(account.id);
+    saveTgMeta(account.id, status.firstName, status.lastName, status.username);
+    const displayName = [status.firstName, status.lastName].filter(Boolean).join(" ");
+    res.json({ tgDisplayName: displayName || null, tgUsername: status.username ?? null });
   } catch (err: any) {
     if (isAuthError(err?.message ?? "")) markSessionExpired(account.id);
     res.status(500).json({ error: err.message });
