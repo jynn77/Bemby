@@ -4,6 +4,18 @@ All notable changes to Bemby are documented here.
 
 ---
 
+## v0.9.26
+
+### 中文
+
+- **消息链接协议白名单** -- Telegram 消息中的 URL 在生成 `<a>` 标签前，现已校验协议白名单（仅允许 `http:`、`https:`、`tg:`）；其他协议（如 `javascript:`、`data:` 等）的链接将以纯文本渲染，不生成可点击链接，消除潜在的 XSS 风险
+
+### English
+
+- **URL protocol whitelist for message links** -- Telegram message URLs are now validated against a protocol whitelist (`http:`, `https:`, `tg:`) before being rendered as `<a>` tags; URLs with any other protocol (e.g. `javascript:`, `data:`) are rendered as plain text instead of clickable links, eliminating a potential XSS vector
+
+---
+
 ## v0.9.25
 
 ### 中文
