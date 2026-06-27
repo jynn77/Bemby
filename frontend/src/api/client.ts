@@ -53,6 +53,8 @@ export type Account = {
   appClientId: string | null;
   createdAt: string;
   sortOrder: number;
+  tgDisplayName: string | null;
+  tgUsername: string | null;
 };
 
 export type AccountExportItem = {
@@ -299,7 +301,7 @@ export const accountsApi = {
   create: (
     data: Omit<
       Account,
-      "id" | "authStatus" | "createdAt" | "disabled" | "sortOrder"
+      "id" | "authStatus" | "createdAt" | "disabled" | "sortOrder" | "tgDisplayName" | "tgUsername"
     > & {
       apiHash: string;
     },
@@ -325,6 +327,10 @@ export const accountsApi = {
   checkStatus: (id: number) =>
     api
       .post<TgAccountStatus>(`/accounts/${id}/check-status`)
+      .then((r) => r.data),
+  refreshTgMeta: (id: number) =>
+    api
+      .post<{ tgDisplayName: string | null; tgUsername: string | null }>(`/accounts/${id}/refresh-tg-meta`)
       .then((r) => r.data),
   export: (ids?: number[]) =>
     api

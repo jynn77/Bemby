@@ -154,6 +154,12 @@ try {
 try {
   db.exec("UPDATE tg_accounts SET sort_order = id WHERE sort_order = 0");
 } catch {}
+try {
+  db.exec("ALTER TABLE tg_accounts ADD COLUMN tg_display_name TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE tg_accounts ADD COLUMN tg_username TEXT");
+} catch {}
 
 // Seed default TG app client profiles (Linux is default)
 try {
