@@ -181,6 +181,7 @@ export type Job = {
   startCommand: string;
   checkinButton: string;
   templateId?: number | null;
+  runEveryDays: number;
 };
 
 export type JobTemplate = {
@@ -197,6 +198,7 @@ export type JobTemplate = {
   checkinButton: string;
   createdAt: string;
   linkedJobCount?: number;
+  runEveryDays: number;
 };
 
 export type EmbywatchLog = {

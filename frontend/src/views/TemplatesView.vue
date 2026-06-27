@@ -169,6 +169,10 @@
             </div>
             <div class="form-row">
               <div class="form-group">
+                <label class="form-label">{{ t('jobs.labelRunEveryDays') }}</label>
+                <input v-model.number="form.runEveryDays" class="form-input" type="number" min="1" max="365" style="max-width:120px" />
+              </div>
+              <div class="form-group">
                 <label class="form-label">{{ t('jobs.labelMaxRetries') }}</label>
                 <input v-model.number="form.retryMax" class="form-input" type="number" min="1" max="10" />
               </div>
@@ -689,6 +693,7 @@ const form = reactive({
   timezone: 'Australia/Sydney',
   replyTimeoutMs: 40000,
   retryMax: 5,
+  runEveryDays: 1,
 });
 
 const embyCfg = reactive<{ username: string; password: string; playDuration: number | string; userAgent: string; markWatched: boolean }>({
@@ -894,6 +899,7 @@ function openEdit(tpl: JobTemplate) {
     timezone: tpl.timezone,
     replyTimeoutMs: tpl.replyTimeoutMs,
     retryMax: tpl.retryMax,
+    runEveryDays: tpl.runEveryDays ?? 1,
   });
   setCmdState(tpl.startCommand === '/start' ? '' : (tpl.startCommand ?? ''));
   setBtnState(tpl.checkinButton === '签到' ? '' : (tpl.checkinButton ?? ''));

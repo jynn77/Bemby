@@ -478,6 +478,10 @@
 
         <div v-if="form.jobType === 'embywatch' && !form.templateId" class="form-row">
           <div class="form-group">
+            <label class="form-label">{{ t('jobs.labelRunEveryDays') }}</label>
+            <input v-model.number="form.runEveryDays" class="form-input" type="number" min="1" max="365" style="max-width:120px" />
+          </div>
+          <div class="form-group">
             <label class="form-label">{{ t('jobs.labelMaxRetries') }}</label>
             <input v-model.number="form.retryMax" class="form-input" type="number" min="1" max="10" />
           </div>
@@ -721,6 +725,7 @@ const form = reactive({
   retryMax: 5,
   enabled: true,
   templateId: null as number | null,
+  runEveryDays: 1,
 });
 
 const linkedTemplate = computed(() => templates.value.find(t => t.id === form.templateId) ?? null);
@@ -791,6 +796,7 @@ function onJobTypeChange() {
   form.accountId = (form.jobType === 'checkin' || form.jobType === 'custom')
     ? (accounts.value[0]?.id ?? null)
     : null;
+  form.runEveryDays = 1;
   customActions.value = [];
   customJobMaxRetries.value = 1;
   btnAiHint.value = '';
@@ -929,6 +935,7 @@ function openAdd() {
     retryMax: Number(settings.value?.default_max_retry ?? 5),
     enabled: true,
     templateId: null,
+    runEveryDays: 1,
   });
   Object.assign(embyCfg, { username: '', password: '', playDuration: '', userAgent: '', markWatched: true });
   Object.assign(embyServer, { protocol: 'https', host: '', port: 443 });
@@ -947,6 +954,7 @@ function openEdit(j: Job) {
     scheduleWindowEnd: j.scheduleWindowEnd, timezone: j.timezone,
     replyTimeoutMs: j.replyTimeoutMs, retryMax: j.retryMax, enabled: j.enabled,
     templateId: j.templateId ?? null,
+    runEveryDays: j.runEveryDays ?? 1,
   });
   setCmdState(j.startCommand === '/start' ? '' : (j.startCommand ?? ''));
   setBtnState(j.checkinButton === '签到' ? '' : (j.checkinButton ?? ''));

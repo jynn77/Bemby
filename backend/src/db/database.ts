@@ -155,6 +155,12 @@ try {
   db.exec("UPDATE tg_accounts SET sort_order = id WHERE sort_order = 0");
 } catch {}
 try {
+  db.exec("ALTER TABLE jobs ADD COLUMN run_every_days INTEGER NOT NULL DEFAULT 1");
+} catch {}
+try {
+  db.exec("ALTER TABLE job_templates ADD COLUMN run_every_days INTEGER NOT NULL DEFAULT 1");
+} catch {}
+try {
   db.exec("ALTER TABLE tg_accounts ADD COLUMN tg_display_name TEXT");
 } catch {}
 try {
