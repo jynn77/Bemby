@@ -138,7 +138,7 @@
                 @touchend.passive="onDialogTouchEnd"
                 @touchmove.passive="onDialogTouchEnd"
               >
-                <div class="tgc-avatar" :class="`tgc-avatar-${d.type}`">
+                <div class="tgc-avatar" :class="`tgc-avatar-${d.type}`" v-avatar-load="d.chatId">
                   <img
                     v-if="avatarSrc(d.chatId)"
                     :src="avatarSrc(d.chatId)"
@@ -211,6 +211,7 @@
               <div
                 class="tgc-avatar tgc-avatar-sm tgc-clickable"
                 :class="`tgc-avatar-${activeChat.type}`"
+                v-avatar-load="activeChat.chatId"
                 @click="openProfile"
               >
                 <img
@@ -320,6 +321,7 @@
                         class="tgc-sender-av"
                         :style="!avatarSrc(msg.fromId) ? { background: senderColor(msg.fromId) } : {}"
                         :title="msg.fromName || ''"
+                        v-avatar-load="msg.fromId"
                       >
                         <img
                           v-if="avatarSrc(msg.fromId)"
@@ -594,6 +596,7 @@
                 <div
                   class="tgc-profile-avatar"
                   :class="`tgc-avatar-${profileDetails.type}`"
+                  v-avatar-load="profileDetails.chatId"
                 >
                   <img
                     v-if="avatarSrc(profileDetails.chatId)"
@@ -1054,6 +1057,10 @@ const joinRequestSent = ref(false);
 const pendingJoinChatId = ref<string | null>(null);
 let membershipPollTimer: ReturnType<typeof setInterval> | null = null;
 
+// Debounced mark-read -- coalesces rapid calls (e.g. burst of incoming messages) into one request
+let markReadTimer: ReturnType<typeof setTimeout> | null = null;
+let markReadPending: { chatId: string; maxId: number } | null = null;
+
 // Watcher that keeps re-fetching the last bot message while the bot is still editing it
 let botMsgWatchTimer: ReturnType<typeof setTimeout> | null = null;
 let botMsgWatchGen = 0;
@@ -1238,6 +1245,8 @@ onBeforeUnmount(() => {
   stopMembershipPoll();
   window.removeEventListener("message", handleMiniAppMessage);
   if (searchTimer.value) clearTimeout(searchTimer.value);
+  _avatarObserver?.disconnect();
+  _avatarObserver = null;
 });
 
 watch(showContacts, async (val) => {
@@ -1312,20 +1321,60 @@ async function ctxPin(pinned: boolean) {
   }
 }
 
-// Returns a data URI from the local cache, or '' if not available yet.
-// Enqueues a fetch the first time a chatId is seen (max 3 concurrent).
-function avatarSrc(chatId: string): string {
-  if (avatarCache.has(chatId)) {
-    const data = avatarCache.get(chatId);
-    return data ? `data:image/jpeg;base64,${data}` : "";
-  }
-  if (!avatarFetching.has(chatId) && !avatarQueued.has(chatId) && selectedAccountId.value) {
-    avatarQueue.push(chatId);
-    avatarQueued.add(chatId);
-    drainAvatarQueue();
-  }
-  return "";
+// Returns a data URI from the local cache, or '' if not yet loaded.
+// Fetches are triggered by the v-avatar-load directive when the element enters the viewport.
+function avatarSrc(chatId: string | null): string {
+  if (!chatId) return "";
+  const data = avatarCache.get(chatId);
+  return data ? `data:image/jpeg;base64,${data}` : "";
 }
+
+// Enqueues a chatId at the front (high priority) so visible avatars load before off-screen ones.
+function enqueueVisibleAvatar(chatId: string): void {
+  if (avatarCache.has(chatId) || avatarFetching.has(chatId) || avatarQueued.has(chatId)) return;
+  if (!selectedAccountId.value) return;
+  avatarQueue.unshift(chatId);
+  avatarQueued.add(chatId);
+  drainAvatarQueue();
+}
+
+let _avatarObserver: IntersectionObserver | null = null;
+
+function getAvatarObserver(): IntersectionObserver {
+  if (!_avatarObserver) {
+    _avatarObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const chatId = (entry.target as HTMLElement).dataset.avatarChatId;
+        if (chatId) {
+          _avatarObserver!.unobserve(entry.target);
+          enqueueVisibleAvatar(chatId);
+        }
+      }
+    }, { threshold: 0 });
+  }
+  return _avatarObserver;
+}
+
+// Vue directive -- place on the avatar container element with the chatId as binding value.
+// Observes the element and triggers a fetch when it scrolls into the viewport.
+const vAvatarLoad = {
+  mounted(el: HTMLElement, binding: { value: string | null }) {
+    if (!binding.value) return;
+    el.dataset.avatarChatId = binding.value;
+    if (avatarCache.has(binding.value)) return; // already cached -- no need to observe
+    getAvatarObserver().observe(el);
+  },
+  updated(el: HTMLElement, binding: { value: string | null; oldValue: string | null }) {
+    if (binding.value === binding.oldValue) return;
+    if (!binding.value) return;
+    el.dataset.avatarChatId = binding.value;
+    if (!avatarCache.has(binding.value)) getAvatarObserver().observe(el);
+  },
+  unmounted(el: HTMLElement) {
+    _avatarObserver?.unobserve(el);
+  },
+};
 
 function drainAvatarQueue(): void {
   while (avatarConcurrencyState.active < AVATAR_CONCURRENCY && avatarQueue.length > 0) {
@@ -2429,13 +2478,34 @@ async function openChat(dialog: TgDialog, addToHistory = false) {
 function markChatRead(chatId: string) {
   if (!selectedAccountId.value || !messages.value.length) return;
   const maxId = Math.max(...messages.value.map((m) => m.id));
-  firstUnreadId.value = null;
+
   // Clear badge immediately in UI
+  firstUnreadId.value = null;
   const idx = dialogs.value.findIndex((d) => d.chatId === chatId);
   if (idx !== -1)
     dialogs.value[idx] = { ...dialogs.value[idx], unreadCount: 0 };
-  // Fire-and-forget -- non-blocking
-  tgClientApi.markRead(selectedAccountId.value, chatId, maxId).catch(() => {});
+
+  // Coalesce into one request per chat -- same chat just bumps maxId and waits
+  if (markReadPending?.chatId === chatId) {
+    markReadPending.maxId = Math.max(markReadPending.maxId, maxId);
+    return;
+  }
+
+  // Different chat -- flush pending immediately before starting a new timer
+  if (markReadPending && markReadTimer) {
+    clearTimeout(markReadTimer);
+    markReadTimer = null;
+    tgClientApi.markRead(selectedAccountId.value, markReadPending.chatId, markReadPending.maxId).catch(() => {});
+  }
+
+  markReadPending = { chatId, maxId };
+  markReadTimer = setTimeout(() => {
+    markReadTimer = null;
+    if (markReadPending && selectedAccountId.value) {
+      tgClientApi.markRead(selectedAccountId.value, markReadPending.chatId, markReadPending.maxId).catch(() => {});
+      markReadPending = null;
+    }
+  }, 2000);
 }
 
 async function clearChatCache() {
