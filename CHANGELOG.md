@@ -4,6 +4,24 @@ All notable changes to Bemby are documented here.
 
 ---
 
+## v0.9.27-jyn
+
+### 中文
+
+- **修复 {aiBtn} 和 {aiInput} 的 API 密钥识别问题** -- 修复了 `{aiBtn}` 和 `{aiInput}` 功能无法读取通过新版 AI 供应商表配置的 API 密钥的问题。`selectButtonWithAI()` 和 `recognizeCaptchaWithAI()` 现改为优先查询 `ai_suppliers` 表，找不到时再回退到旧版扁平设置。
+- **修复前端 aiKeyMissing 检测** -- 任务表单中的 `{aiBtn}` 选项现同时检查供应商表和旧版扁平设置中的 API 密钥，避免因只检查旧设置而导致选项被错误禁用。
+- **后端**: `selectButtonWithAI()` 和 `recognizeCaptchaWithAI()` 增加供应商表查询逻辑。
+- **前端**: `JobsView.vue` 新增加载供应商列表逻辑，`aiKeyMissing` 改为双向检查。
+
+### English
+
+- **Fixed {aiBtn} and {aiInput} API key resolution** -- Fixed a bug where `{aiBtn}` and `{aiInput}` features failed to read API keys configured via the new AI supplier table. `selectButtonWithAI()` and `recognizeCaptchaWithAI()` now query the `ai_suppliers` table first, falling back to legacy flat settings.
+- **Fixed frontend aiKeyMissing detection** -- The `{aiBtn}` option in the job form now checks both the supplier list and legacy flat settings for API keys, preventing the option from being incorrectly disabled.
+- **Backend**: Added supplier table lookup in `selectButtonWithAI()` and `recognizeCaptchaWithAI()`.
+- **Frontend**: `JobsView.vue` now loads the supplier list; `aiKeyMissing` checks both sources.
+
+---
+
 ## v0.9.27
 
 ### 中文

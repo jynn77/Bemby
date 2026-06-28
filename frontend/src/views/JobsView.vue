@@ -614,7 +614,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import { jobsApi, accountsApi, statusApi, settingsApi, logsApi, templatesApi, type Job, type JobTemplate, type Account, type ScheduleStatus, type Settings, type UAPreset, type EmbywatchConfig, type CustomConfig } from '../api/client';
+import { jobsApi, accountsApi, statusApi, settingsApi, logsApi, templatesApi, aiSuppliersApi, type Job, type JobTemplate, type Account, type ScheduleStatus, type Settings, type UAPreset, type EmbywatchConfig, type CustomConfig, type AiSupplier } from '../api/client';
 import { t, locale } from '../i18n';
 import { usePersistedRef } from '../composables/usePersistedRef';
 
@@ -644,6 +644,7 @@ const sortedScheduleStatus = computed(() =>
   [...scheduleStatus.value].sort((a, b) => a.nextRun.localeCompare(b.nextRun))
 );
 const settings = ref<Settings | null>(null);
+const suppliers = ref<AiSupplier[]>([]);
 const uaPresets = computed<UAPreset[]>(() => {
   try { return JSON.parse(settings.value?.ua_presets ?? '[]'); } catch { return []; }
 });
@@ -769,7 +770,12 @@ const embyServer = reactive<{ protocol: 'https' | 'http'; host: string; port: nu
 });
 const formError = ref('');
 const saving = ref(false);
-const aiKeyMissing = computed(() => !settings.value?.ai_api_key);
+const aiKeyMissing = computed(() => {
+  // Check suppliers table first (modern system)
+  if (suppliers.value.some(s => s.api_key !== '')) return false;
+  // Fall back to flat settings (legacy)
+  return !settings.value?.ai_api_key;
+});
 
 const CMD_PRESETS = new Set(['', '/start', '/checkin'])
 const ACTION_CMD_PRESETS = new Set(['/start', '/checkin'])
@@ -852,11 +858,15 @@ function moveDown(i: number) {
 }
 
 onMounted(async () => {
-  await Promise.all([loadJobs(), loadAccounts(), loadStatus(), loadSettings(), loadTemplates()]);
+  await Promise.all([loadJobs(), loadAccounts(), loadStatus(), loadSettings(), loadSuppliers(), loadTemplates()]);
 });
 
 async function loadSettings() {
   try { settings.value = await settingsApi.get(); } catch { /* ignore */ }
+}
+
+async function loadSuppliers() {
+  try { suppliers.value = await aiSuppliersApi.list(); } catch { /* ignore */ }
 }
 
 async function loadTemplates() {

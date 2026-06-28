@@ -192,12 +192,22 @@ export async function recognizeCaptchaWithAI(
   images: string[],
   length?: number,
 ): Promise<AiInputResult> {
-  const apiKey = getAiSetting('ai_api_key', 'AI_API_KEY', '');
+  const model = getAiSetting('ai_model', 'AI_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free');
+
+  // Resolve credentials from the suppliers table (model_id → supplier)
+  type SupplierCreds = { api_key: string; base_url: string; timeout_ms: number };
+  const supplierRow = db.prepare(`
+    SELECT s.api_key, s.base_url, s.timeout_ms
+    FROM ai_models m JOIN ai_suppliers s ON s.id = m.supplier_id
+    WHERE m.model_id = ? LIMIT 1
+  `).get(model) as SupplierCreds | undefined;
+
+  const apiKey  = supplierRow?.api_key  ?? getAiSetting('ai_api_key',   'AI_API_KEY',  '');
   if (!apiKey) throw new Error('{aiInput} requires an AI API key — configure it in Settings');
   if (!images.length) throw new Error('{aiInput} requires an image in the previous message');
 
-  const baseUrl = getAiSetting('ai_base_url', 'AI_BASE_URL', 'https://openrouter.ai/api/v1').replace(/\/$/, '');
-  const model = getAiSetting('ai_model', 'AI_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free');
+  const baseUrl = (supplierRow?.base_url ?? getAiSetting('ai_base_url', 'AI_BASE_URL', 'https://openrouter.ai/api/v1')).replace(/\/$/, '');
+  const AI_TIMEOUT_MS = supplierRow ? supplierRow.timeout_ms : Number(getAiSetting('ai_timeout_ms', 'AI_TIMEOUT_MS', '25000'));
 
   const prompt = buildCaptchaPrompt(length);
 
@@ -205,7 +215,6 @@ export async function recognizeCaptchaWithAI(
   for (const img of images) content.push({ type: 'image_url', image_url: { url: img } });
   content.push({ type: 'text', text: prompt });
 
-  const AI_TIMEOUT_MS = Number(getAiSetting('ai_timeout_ms', 'AI_TIMEOUT_MS', '25000'));
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -234,22 +243,31 @@ export async function selectButtonWithAI(
   hint?: string,
   maxRetries = 0,
 ): Promise<AiSelectionResult> {
-  const apiKey = getAiSetting('ai_api_key', 'AI_API_KEY', '');
+  const model = getAiSetting('ai_model', 'AI_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free');
+
+  // Resolve credentials from the suppliers table (model_id → supplier)
+  type SupplierCreds = { api_key: string; base_url: string; timeout_ms: number };
+  const supplierRow = db.prepare(`
+    SELECT s.api_key, s.base_url, s.timeout_ms
+    FROM ai_models m JOIN ai_suppliers s ON s.id = m.supplier_id
+    WHERE m.model_id = ? LIMIT 1
+  `).get(model) as SupplierCreds | undefined;
+
+  const apiKey  = supplierRow?.api_key  ?? getAiSetting('ai_api_key',   'AI_API_KEY',  '');
   if (!apiKey) throw new Error('{aiBtn} requires an AI API key — configure it in Settings');
 
-  const baseUrl = getAiSetting('ai_base_url', 'AI_BASE_URL', 'https://openrouter.ai/api/v1').replace(/\/$/, '');
-  const model = getAiSetting('ai_model', 'AI_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free');
+  const baseUrl = (supplierRow?.base_url ?? getAiSetting('ai_base_url', 'AI_BASE_URL', 'https://openrouter.ai/api/v1')).replace(/\/$/, '');
+  const AI_TIMEOUT_MS = supplierRow ? supplierRow.timeout_ms : Number(getAiSetting('ai_timeout_ms', 'AI_TIMEOUT_MS', '25000'));
 
   const flat = buttons.flat();
   const text = htmlToText(html);
   const task = hint ?? ('pick ONE button based on the message' + (images.length ? ' and attached image(s).' : ''));
-  const prompt = `Task: "${task}".\n\nThe message:\n${text}\n\nThe available inline buttons are: ${JSON.stringify(flat)}\n\nWhich button should be clicked to "${task}"? If you don't know which button, please pick the most likely one. You MUST reply with ONLY the EXACT BUTTON TEXT from the available list, nothing else. Do NOT include any thinking logic.`;
+  const prompt = `Task: \"${task}\".\n\nThe message:\n${text}\n\nThe available inline buttons are: ${JSON.stringify(flat)}\n\nWhich button should be clicked to \"${task}\"? If you don't know which button, please pick the most likely one. You MUST reply with ONLY the EXACT BUTTON TEXT from the available list, nothing else. Do NOT include any thinking logic.`;
 
   const content: object[] = [];
   for (const img of images) content.push({ type: 'image_url', image_url: { url: img } });
   content.push({ type: 'text', text: prompt });
 
-  const AI_TIMEOUT_MS = Number(getAiSetting('ai_timeout_ms', 'AI_TIMEOUT_MS', '25000'));
   const effectiveMax = Math.min(maxRetries, 5); // hard cap to avoid exhausting AI credits
   const failedResponses: string[] = [];
 
@@ -278,7 +296,7 @@ export async function selectButtonWithAI(
     failedResponses.push(picked);
   }
 
-  const err = new Error(`AI selected "${failedResponses.at(-1)}" but it does not match any available button after ${effectiveMax + 1} attempt(s): ${JSON.stringify(flat)}`);
+  const err = new Error(`AI selected \"${failedResponses.at(-1)}\" but it does not match any available button after ${effectiveMax + 1} attempt(s): ${JSON.stringify(flat)}`);
   (err as any).aiRetries = failedResponses;
   (err as any).aiPrompt = prompt;
   (err as any).aiResponse = failedResponses.at(-1) ?? '';
