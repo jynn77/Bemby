@@ -4,7 +4,7 @@ All notable changes to Bemby are documented here.
 
 ---
 
-## v0.9.26
+## v0.9.27
 
 ### 中文
 
