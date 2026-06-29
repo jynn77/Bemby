@@ -619,6 +619,7 @@ export async function sendMessage(
 
   const result = await entry.client.sendMessage(entity, {
     message: text,
+    parseMode: undefined,
     ...(replyToMsgId ? { replyTo: replyToMsgId } : {}),
   });
   return { id: result.id, date: result.date };
